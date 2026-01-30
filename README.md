@@ -1,8 +1,5 @@
 # project-golem
 Headless browser agent powered by Gemini &amp; Ollama.
-這是一份為 **Project Golem v3.5 (Fortress Ultimate Edition)** 量身打造的專業 `README.md`。
-
-這份文檔不僅包含了安裝指南，還特別強調了你最引以為傲的 **「三級風險控制」** 與 **「動態權限提升」** 機制，讓瀏覽這個專案的人一眼就能看出這不是普通的 Chatbot，而是一個具備資安思維的 AI Agent。
 
 ---
 
