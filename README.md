@@ -1,6 +1,6 @@
 # project-golem
 Headless browser agent powered by Gemini &amp; Ollama.
-# 🦞 Project Golem (魔像計畫)
+#  Project Golem (魔像計畫)
 
 > **"Machine Body, God Mind."**
 > 一個基於 Puppeteer (手腳) 與 Ollama (視覺) 的雙腦協作 AI 代理人。
