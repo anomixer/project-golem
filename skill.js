@@ -144,7 +144,17 @@ const SKILLS = {
     當使用者需要硬體詳細資訊時：
     1. OS 版本：Linux用 \`uname -a\`, Windows用 \`Get-ComputerInfo\`
     2. CPU 資訊：Linux用 \`lscpu\`, Windows用 \`Get-CimInstance Win32_Processor\`
-    `
+    `,
+    // 在 skills.js 的 SKILLS 物件內新增：
+
+    // 🌐 瀏覽者：讀取網頁原始碼
+    WEB_READER: `
+    【已載入技能：網頁瀏覽者 (Web Fetcher)】
+    當需要讀取特定 URL 的內容、API 回傳值，或 Gemini 無法存取的內網頁面時：
+    1. 簡單讀取：\`curl -L [URL]\`
+    2. 讀取並過濾 HTML 標籤 (只看文字)：Linux用 \`curl -L [URL] | sed 's/<[^>]*>//g'\`
+    3. 下載檔案：\`curl -L -o [檔名] [URL]\`
+    `,
 };
 
 // ============================================================
