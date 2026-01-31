@@ -2,7 +2,7 @@
  * 🦞 Project Golem v6.3 (Ouroboros Edition)
  * ---------------------------------------------------
  * 架構：[Gemini 大腦] -> [Ollama 翻譯官] -> [Security 審計官] -> [Node.js 執行者]
- * 新增特性：自我內省、熱修復補丁 (Hotfix)、自主進化排程、失敗經驗學習
+ * 特性：自我內省、熱修復補丁、自主進化、人格記憶、雙模互動
  */
 
 require('dotenv').config();
@@ -13,9 +13,9 @@ const { Ollama } = require('ollama');
 const { exec, execSync } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const os = require('os');
-const fs = require('fs');       // 👈 新增：檔案系統操作
-const path = require('path');   // 👈 新增：路徑處理
-const skills = require('./skills');
+const fs = require('fs');
+const path = require('path');
+const skills = require('./skill'); // 引入技能與人格
 
 // --- ⚙️ 全域配置 ---
 const CONFIG = {
@@ -34,7 +34,7 @@ const pendingTasks = new Map(); // 暫存等待審核的 Shell 任務
 global.pendingPatch = null;     // 暫存等待審核的 代碼 Patch
 
 // ============================================================
-// 🧠 Experience Memory (新增：經驗記憶體)
+// 🧠 Experience Memory (經驗記憶體)
 // ============================================================
 class ExperienceMemory {
     constructor() {
@@ -86,7 +86,7 @@ class ExperienceMemory {
 const memory = new ExperienceMemory();
 
 // ============================================================
-// 🪞 Introspection (新增：內省模組)
+// 🪞 Introspection (內省模組)
 // ============================================================
 class Introspection {
     static readSelf() {
@@ -101,14 +101,12 @@ class Introspection {
 }
 
 // ============================================================
-// 🩹 Patch Manager (新增：神經補丁管理)
+// 🩹 Patch Manager (神經補丁管理)
 // ============================================================
 class PatchManager {
     static apply(originalCode, patch) {
-        // 移除前後空白以提高匹配率
-        const normalize = (str) => str.trim();
         if (!originalCode.includes(patch.search)) {
-            // 簡單容錯：嘗試移除縮排後匹配 (可擴充)
+            // 簡單容錯：若找不到完全匹配，拋出錯誤 (未來可加入 Fuzzy Match)
             throw new Error(`❌ 找不到匹配的原始代碼段落`);
         }
         return originalCode.replace(patch.search, patch.replace);
@@ -143,7 +141,7 @@ class PatchManager {
 }
 
 // ============================================================
-// 🕰️ Autonomy Manager (新增：自主進化排程)
+// 🕰️ Autonomy Manager (自主進化排程)
 // ============================================================
 class AutonomyManager {
     constructor(bot, brain, chatId) {
@@ -164,9 +162,6 @@ class AutonomyManager {
         const range = 12; 
         const nextWaitHours = minHours + Math.random() * range;
         
-        // 測試模式：縮短為 10 秒後觸發 (正式使用請註解下面這行，解開上面那行)
-        // const nextWaitHours = 0.002; 
-
         console.log(`💤 [Autonomy] Golem 進入休眠，預計 ${nextWaitHours.toFixed(1)} 小時後進行自我審查。`);
 
         setTimeout(() => {
@@ -199,7 +194,6 @@ class AutonomyManager {
 
             const rawResponse = await this.brain.sendMessage(prompt);
             let jsonStr = rawResponse.replace(/```json|```/g, '').trim();
-            // 嘗試提取 JSON 部分
             const jsonMatch = jsonStr.match(/\[\s*\{[\s\S]*\}\s*\]/);
             if(jsonMatch) jsonStr = jsonMatch[0];
 
@@ -213,15 +207,12 @@ class AutonomyManager {
             if (PatchManager.verify(testFile)) {
                 global.pendingPatch = testFile;
                 
-                // 發送互動介面
                 const opts = {
                     reply_markup: {
-                        inline_keyboard: [
-                            [
-                                { text: '🚀 部署 (Deploy)', callback_data: 'PATCH_DEPLOY' },
-                                { text: '🗑️ 丟棄 (Drop)', callback_data: 'PATCH_DROP' }
-                            ]
-                        ]
+                        inline_keyboard: [[
+                            { text: '🚀 部署 (Deploy)', callback_data: 'PATCH_DEPLOY' },
+                            { text: '🗑️ 丟棄 (Drop)', callback_data: 'PATCH_DROP' }
+                        ]]
                     }
                 };
 
@@ -233,7 +224,6 @@ class AutonomyManager {
                 );
                 await this.bot.sendDocument(this.chatId, testFile);
             }
-
         } catch (e) {
             console.error("進化失敗:", e.message);
         }
@@ -241,7 +231,7 @@ class AutonomyManager {
 }
 
 // ============================================================
-// 🔍 System Fingerprint (原有)
+// 🔍 System Fingerprint (環境感知)
 // ============================================================
 function getSystemFingerprint() {
     try {
@@ -267,7 +257,7 @@ function getSystemFingerprint() {
 }
 
 // ============================================================
-// 🛡️ Security Manager (原有)
+// 🛡️ Security Manager (安全審計)
 // ============================================================
 class SecurityManager {
     constructor() {
@@ -288,7 +278,7 @@ class SecurityManager {
 }
 
 // ============================================================
-// 🧠 Golem Brain (原有)
+// 🧠 Golem Brain (Gemini)
 // ============================================================
 class GolemBrain {
     constructor() {
@@ -296,25 +286,35 @@ class GolemBrain {
         this.page = null;
     }
 
-    async init() {
-        if (this.browser) return;
-        console.log('🧠 [Brain] 啟動 Gemini...');
-        this.browser = await puppeteer.launch({
-            headless: false,
-            userDataDir: CONFIG.USER_DATA_DIR,
-            args: ['--no-sandbox', '--window-size=1280,900']
-        });
+    // ✨ 修改：支援 forceReload 參數，用於改名後重新載入 Prompt
+    async init(forceReload = false) {
+        if (this.browser && !forceReload) return;
+        
+        if (!this.browser) {
+            console.log('🧠 [Brain] 啟動 Gemini...');
+            this.browser = await puppeteer.launch({
+                headless: false,
+                userDataDir: CONFIG.USER_DATA_DIR,
+                args: ['--no-sandbox', '--window-size=1280,900']
+            });
+        }
 
-        const pages = await this.browser.pages();
-        this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
-        await this.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
+        if (!this.page) {
+            const pages = await this.browser.pages();
+            this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
+            await this.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
+        }
 
-        console.log('🔍 [System] 正在掃描本機環境...');
-        const fingerprint = getSystemFingerprint();
-        const systemPrompt = skills.getSystemPrompt(fingerprint);
-
-        await this.sendMessage(systemPrompt, true);
-        console.log('🧠 [Brain] 環境感知與雙腦連結已就緒。');
+        if (forceReload || !this.page) {
+            console.log('📚 [Brain] 正在載入人格與技能...');
+            const fingerprint = getSystemFingerprint();
+            // 從 skills.js 獲取包含新名字的 Prompt
+            const systemPrompt = skills.getSystemPrompt(fingerprint);
+            
+            await this.sendMessage(systemPrompt, true);
+            const p = skills.persona.get();
+            console.log(`🧠 [Brain] 人格已更新: ${p.aiName} <-> ${p.userName}`);
+        }
     }
 
     async sendMessage(text, isSystem = false) {
@@ -349,7 +349,7 @@ class GolemBrain {
 }
 
 // ============================================================
-// 🦎 Golem Translator (原有)
+// 🦎 Golem Translator (Ollama)
 // ============================================================
 class GolemTranslator {
     async parse(planText) {
@@ -377,7 +377,7 @@ class GolemTranslator {
 }
 
 // ============================================================
-// ⚡ Task Controller (原有)
+// ⚡ Task Controller (核心控制)
 // ============================================================
 class TaskController {
     constructor() {
@@ -444,11 +444,22 @@ class Executor {
 const brain = new GolemBrain();
 const translator = new GolemTranslator();
 const controller = new TaskController();
-const autonomy = new AutonomyManager(bot, brain, CONFIG.ADMIN_ID); // 👈 初始化自主模組
+const autonomy = new AutonomyManager(bot, brain, CONFIG.ADMIN_ID);
 
 (async () => {
     await brain.init();
-    autonomy.start(); // 👈 啟動自主進化排程
+    autonomy.start();
+
+    // 👋 新增：初次見面問候邏輯
+    const persona = skills.persona.get();
+    if (persona.isNew && CONFIG.ADMIN_ID) {
+        await bot.sendMessage(CONFIG.ADMIN_ID, 
+            `🎉 **系統啟動成功！**\n\n` +
+            `初次見面，我目前的預設代號是 **${persona.aiName}**。\n` +
+            `請問我該如何稱呼您？\n\n` +
+            `👉 請回覆： \`/callme [您的稱呼]\``
+        );
+    }
 })();
 
 // --- 輔助函式：部署與丟棄 ---
@@ -460,7 +471,7 @@ async function executeDeploy(chatId) {
         fs.writeFileSync(__filename, patchContent); // 覆蓋
         fs.unlinkSync(global.pendingPatch); // 清理
         global.pendingPatch = null;
-        memory.recordSuccess(); // 記住成功
+        memory.recordSuccess(); 
         await bot.sendMessage(chatId, "🚀 **系統升級完畢！** 正在重啟神經網路...");
         process.exit(0);
     } catch (e) {
@@ -472,7 +483,7 @@ async function executeDrop(chatId) {
     if (!global.pendingPatch) return;
     fs.unlinkSync(global.pendingPatch);
     global.pendingPatch = null;
-    const failCount = memory.recordRejection(); // 記住失敗
+    const failCount = memory.recordRejection(); 
     await bot.sendMessage(chatId, `🗑️ 已丟棄提案 (連續拒絕: ${failCount} 次)`);
 }
 
@@ -494,26 +505,62 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(chatId, "🚫 未授權的使用者。");
     }
 
-    // 🌟 優先：待審核 Patch 的意圖識別
+    // 🌟 1. 優先：待審核 Patch 的意圖識別
     if (global.pendingPatch) {
         const intent = detectIntent(text);
         if (intent === 'DEPLOY') { await executeDeploy(chatId); return; }
         if (intent === 'DROP') { await executeDrop(chatId); return; }
     }
 
-    // 🌟 功能：手動觸發進化 (/patch, /audit)
-    if (text.startsWith('/patch') || text.includes('優化代碼')) {
-        const req = text.replace('/patch', '').trim() || "優化現有代碼結構";
-        bot.sendMessage(chatId, `🧬 收到了，正在針對「${req}」進行基因改造...`);
-        // 這裡重複利用 Autonomy 的邏輯，但為了簡單演示，我們讓它下一次循環快點觸發，或直接呼叫 brain
-        // 在此範例，我們直接觸發一次腦力激盪
+    // 🌟 2. 身份設定指令 (NEW)
+    // 幫使用者取名
+    if (text.startsWith('/callme') || text.startsWith('叫我')) {
+        const newName = text.replace(/\/callme|叫我/g, '').trim();
+        if (newName) {
+            skills.persona.setName('user', newName);
+            await brain.init(true); // 強制刷新 Prompt
+            return bot.sendMessage(chatId, `👌 沒問題，以後我就稱呼您為 **${newName}**。`);
+        }
+    }
+    // 幫 AI 取名
+    if (text.startsWith('/setname') || text.startsWith('你叫')) {
+        const newName = text.replace(/\/setname|你叫/g, '').trim();
+        if (newName) {
+            skills.persona.setName('ai', newName);
+            await brain.init(true); // 強制刷新 Prompt
+            return bot.sendMessage(chatId, `🤖 系統重命名完成。**${newName}** 隨時為您服務，${skills.persona.get().userName}。`);
+        }
+    }
+
+    // 🌟 3. 手動進化指令
+    if (text.startsWith('/patch') || text.includes('優化代碼') || text.startsWith('/audit')) {
+        const req = text.replace('/patch', '').replace('/audit', '').trim() || "優化現有代碼結構";
+        bot.sendMessage(chatId, `🧬 收到了，正在針對「${req}」進行分析與改造...`);
+        
+        // 觸發 Autonomy 的邏輯 (這裡手動執行一次反射)
         const currentCode = Introspection.readSelf();
-        const prompt = `【任務】代碼熱修復\n【需求】${req}\n【源碼】\n${currentCode.slice(0,10000)}\n【格式】JSON Array Patch`;
-        // ... (這裡可以擴充手動 Patch 的完整邏輯，為節省篇幅，建議直接等待 Autonomy 或使用 /audit)
+        const prompt = `【任務】代碼熱修復\n【需求】${req}\n【源碼】\n${currentCode.slice(0,12000)}\n【格式】請輸出符合 PatchManager 格式的 JSON Array Patch`;
+        
+        try {
+            const rawResponse = await brain.sendMessage(prompt);
+            let jsonStr = rawResponse.replace(/```json|```/g, '').trim();
+            const jsonMatch = jsonStr.match(/\[\s*\{[\s\S]*\}\s*\]/);
+            if(jsonMatch) jsonStr = jsonMatch[0];
+            const patches = JSON.parse(jsonStr);
+            const testFile = PatchManager.createTestClone(__filename, patches);
+            if (PatchManager.verify(testFile)) {
+                global.pendingPatch = testFile;
+                const opts = { reply_markup: { inline_keyboard: [[{ text: '🚀 部署', callback_data: 'PATCH_DEPLOY' }, { text: '🗑️ 丟棄', callback_data: 'PATCH_DROP' }]] } };
+                await bot.sendMessage(chatId, `💡 **手動進化提案已就緒！**\n附件是測試代碼，請審閱：`, opts);
+                await bot.sendDocument(chatId, testFile);
+            }
+        } catch (e) {
+            bot.sendMessage(chatId, `❌ 進化生成失敗: ${e.message}`);
+        }
         return; 
     }
 
-    // 原有邏輯
+    // 🌟 4. 一般對話與任務 (原有邏輯)
     bot.sendChatAction(chatId, 'typing');
     try {
         const raw = await brain.sendMessage(text);
@@ -549,7 +596,7 @@ bot.on('callback_query', async (query) => {
     }
 
     // B. 處理 Shell 任務按鈕 (原有)
-    if (!data.includes(':')) return; // 簡單過濾
+    if (!data.includes(':')) return; 
     const [action, taskId] = data.split(':');
     const task = pendingTasks.get(taskId);
 
