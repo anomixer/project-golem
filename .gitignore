@@ -1,5 +1,19 @@
+```gitignore
+# 依賴套件
 node_modules/
+
+# 環境變數 (絕對不能上傳)
 .env
-.DS_Store
+
+# Google 登入 Session 資料 (絕對不能上傳)
 golem_memory/
-user_data/
+golem_memory_*/
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# Log 檔案
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
