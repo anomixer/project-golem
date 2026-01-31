@@ -1,8 +1,8 @@
 /**
- * 🦞 Project Golem v6.0 (Fortress Edition)
+ * 🦞 Project Golem v6.1 (Modular Fortress Edition)
  * ---------------------------------------------------
  * 架構：[Gemini 大腦] -> [Ollama 翻譯官] -> [Security 審計官] -> [Node.js 執行者]
- * 特性：情緒回饋、指令拆解、風險分級、中斷確認
+ * 特性：情緒回饋、指令拆解、風險分級、中斷確認、模組化技能書
  */
 
 require('dotenv').config();
@@ -12,6 +12,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { Ollama } = require('ollama');
 const { exec } = require('child_process');
 const { v4: uuidv4 } = require('uuid'); // 用於生成唯一的審核 ID
+const skills = require('./skills'); // 👈 新增：引入外部技能書
 
 // --- ⚙️ 全域配置 ---
 const CONFIG = {
@@ -83,28 +84,17 @@ class GolemBrain {
             userDataDir: CONFIG.USER_DATA_DIR,
             args: ['--no-sandbox', '--window-size=1280,900']
         });
-        
+
         const pages = await this.browser.pages();
         this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
         await this.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
-        
-        // 注入雙重人格 Prompt
-        const systemPrompt = `
-        【指令】你現在是 Golem 系統管理員。
-        當使用者提出請求時，請將回應分為兩部分：
-        1. 【對話部分】：用溫暖、專業的語氣回覆使用者。
-        2. 【操作部分】：若需執行電腦指令，請在分隔線後列出計畫。
-        
-        分隔線為：${CONFIG.SPLIT_TOKEN}
-        
-        範例：
-        好的，我來幫您清除暫存檔。
-        ${CONFIG.SPLIT_TOKEN}
-        1. 執行 ls -lh /tmp 查看大小
-        2. 執行 rm -rf /tmp/* 清空
-        `;
+
+        // 👇 修改處：使用 skills.js 載入系統提示詞
+        console.log('📚 [Brain] 正在載入技能模組...');
+        const systemPrompt = skills.getSystemPrompt();
+
         await this.sendMessage(systemPrompt, true);
-        console.log('🧠 [Brain] 雙重人格已就緒。');
+        console.log('🧠 [Brain] 雙重人格與技能已就緒。');
     }
 
     async sendMessage(text, isSystem = false) {
@@ -112,13 +102,13 @@ class GolemBrain {
         try {
             const selector = 'div[contenteditable="true"], rich-textarea > div';
             await this.page.waitForSelector(selector, { timeout: 15000 });
-            
+
             await this.page.evaluate((sel, txt) => {
                 const el = document.querySelector(sel);
                 el.focus();
                 document.execCommand('insertText', false, txt);
             }, selector, text);
-            
+
             await new Promise(r => setTimeout(r, 800));
             await this.page.keyboard.press('Enter');
 
@@ -146,7 +136,7 @@ class GolemTranslator {
     async parse(planText) {
         if (!planText || planText.trim().length < 2) return [];
         console.log('🦎 [Translator] 解析指令中...');
-        
+
         const prompt = `
         【任務】從下方文字提取 Shell 指令。
         【文字】"${planText}"
@@ -221,7 +211,7 @@ ${riskIcon} **操作請求確認** (${i + 1}/${steps.length})
                         ]]
                     }
                 });
-                
+
                 return; // 暫停迴圈，等待回調
             }
 
@@ -235,7 +225,7 @@ ${riskIcon} **操作請求確認** (${i + 1}/${steps.length})
                 return;
             }
         }
-        
+
         await bot.sendMessage(chatId, `🎉 **所有任務執行完畢**\n${logBuffer}`);
     }
 }
@@ -320,13 +310,13 @@ bot.on('callback_query', async (query) => {
     if (action === 'APPROVE') {
         await bot.answerCallbackQuery(id, { text: '授權通過，繼續執行...' });
         const { steps, nextIndex, chatId } = task;
-        
+
         // 執行當前這一步 (因為之前暫停了)
         const currentStep = steps[nextIndex];
         try {
             await bot.sendMessage(chatId, `🔥 **已授權執行**: \`${currentStep.cmd}\``, { parse_mode: 'Markdown' });
             await new Executor().run(currentStep.cmd);
-            
+
             // 移除暫存
             pendingTasks.delete(taskId);
 
@@ -340,5 +330,5 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-console.log('📡 Golem v6.0 (Fortress) is Online.');
+console.log('📡 Golem v6.1 (Modular Fortress) is Online.');
 console.log('🛡️ Security Protocols Active.');
