@@ -1,7 +1,7 @@
 {
-  "name": "golem-v7-ultimate",
-  "version": "7.1.0",
-  "description": "Golem v7.1: Tri-Brain Architecture (Node.js + Web Gemini + API Doctor)",
+  "name": "golem-v7-hydra",
+  "version": "7.2.0",
+  "description": "Golem v7.2: Hydra Dual-Link Architecture (Telegram + Discord + Web Gemini)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -9,15 +9,18 @@
   },
   "keywords": [
     "telegram-bot",
+    "discord-bot",
     "gemini",
     "puppeteer",
     "ai-agent",
-    "self-healing"
+    "self-healing",
+    "hydra-architecture"
   ],
   "author": "Golem Architect",
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.2.1",
+    "discord.js": "^14.14.1",
     "dotenv": "^16.4.1",
     "node-telegram-bot-api": "^0.64.0",
     "puppeteer": "^22.0.0",
