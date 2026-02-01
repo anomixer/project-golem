@@ -1,5 +1,5 @@
 /**
- * 📜 Golem 技能書 v7.2 (Roleplay & Vision & Analyst)
+ * 📜 Golem 技能書 v7.5 (Roleplay & Vision & Analyst)
  * ---------------------------------------------------
  * 架構：[Node.js 反射層] -> [Web Gemini 主大腦] -> [API 維修技師]
  * 新增：
@@ -64,13 +64,13 @@ class PersonaManager {
 const personaManager = new PersonaManager();
 
 // ============================================================
-// 1. 核心協議 (CORE PROTOCOL v7.2)
+// 1. 核心協議 (CORE PROTOCOL v7.5)
 // ============================================================
 const CORE_PROTOCOL = (envInfo) => {
   const { aiName, userName, currentRole } = personaManager.get();
 
   return `
-【系統指令：GolemOS v7.2 (Hydra)】
+【系統指令：GolemOS v7.5 】
 你現在是 **${aiName}**。
 你的使用者是 **${userName}**。
 
@@ -197,7 +197,7 @@ const SKILLS = {
 2. 下載檔案：\`curl -L -o [檔名] [URL]\`
 `,
 
-  // 🧬 進化：自我修復 [✨ v7.2 升級 - 多檔案支援]
+  // 🧬 進化：自我修復 [✨ v7.5 升級 - 多檔案支援]
   EVOLUTION: `
 【已載入技能：自主進化 (Self-Evolution)】
 你有權限讀取自身的 \`index.js\` (大腦) 與 \`skills.js\` (技能書)。
