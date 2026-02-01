@@ -24,28 +24,28 @@ Golem v7.5 的運作基於三大核心支柱：**反射神經**、**認知大腦
 
 ```mermaid
 graph TD
-    User[📱 使用者 (TG/DC)] -->|訊息/指令| Context[🔌 Universal Context (通用語境層)]
+    User["📱 使用者 (TG/DC)"] -->|訊息/指令| Context["🔌 Universal Context (通用語境層)"]
     
-    Context --> Router{⚡ NodeRouter (反射層)}
+    Context --> Router{"⚡ NodeRouter (反射層)"}
     
-    Router --"/help, /callme"--> FastReply[🚀 快速回覆 (0延遲)]
-    Router --"複雜對話"--> Brain[🧠 Web Gemini (主大腦)]
+    Router --"/help, /callme"--> FastReply["🚀 快速回覆 (0延遲)"]
+    Router --"複雜對話"--> Brain["🧠 Web Gemini (主大腦)"]
     
     subgraph "The Ghost in the Shell (靈魂與意識)"
-        Brain -->|決策| Autonomy[🕰️ AutonomyManager (自主靈魂)]
-        Autonomy -->|定時甦醒| FreeWill{🎲 自由意志決策}
-        FreeWill --"聊天/新聞"--> Notify[💬 主動推播]
-        FreeWill --"優化代碼"--> Evo[🧬 Evolution (自我進化)]
+        Brain -->|決策| Autonomy["🕰️ AutonomyManager (自主靈魂)"]
+        Autonomy -->|定時甦醒| FreeWill{"🎲 自由意志決策"}
+        FreeWill --"聊天/新聞"--> Notify["💬 主動推播"]
+        FreeWill --"優化代碼"--> Evo["🧬 Evolution (自我進化)"]
     end
     
     subgraph "Execution Layer (執行層)"
-        Brain --"JSON指令"--> Executor[💻 系統執行者]
-        Evo --> Patch[🩹 PatchManager (神經補丁)]
-        Patch -->|❌ 觸碰禁區| KernelGuard[🛡️ Kernel Guard (攔截)]
-        Patch -->|✅ 通過驗證| HotReload[🔥 熱重啟]
+        Brain --"JSON指令"--> Executor["💻 系統執行者"]
+        Evo --> Patch["🩹 PatchManager (神經補丁)"]
+        Patch -->|❌ 觸碰禁區| KernelGuard["🛡️ Kernel Guard (攔截)"]
+        Patch -->|✅ 通過驗證| HotReload["🔥 熱重啟"]
     end
     
-    Executor --> Output[回傳結果]
+    Executor --> Output["回傳結果"]
     Output --> Context
 
 ```
@@ -63,19 +63,19 @@ graph TD
 * **優勢**：獲得了 **免費的聯網能力** (可用於查新聞、找資料) 與 **超長上下文記憶**。
 * **自癒機制 (DOM Doctor)**：當 Google 網頁改版導致按鈕失效時，會自動切換到 API 模式修復 CSS Selector。
 
-#### 🕰️ AutonomyManager (自主靈魂) `v7.5 New`
+#### 🕰️ AutonomyManager (自主靈魂)
 
 * **生命週期**：不再是死板的 `while(true)` 循環。它擁有隨機的甦醒時間 (2~5小時) 與作息觀念 (深夜靜默)。
-* **自由意志**：醒來時，它會依據內部邏輯自主決定當下的行動：是去讀 Google News？還是檢查自己的程式碼？亦或是單純想找主人聊天？
+* **自由意志**：醒來時，它會依據內部邏輯自主決定當下的行動：是去讀 Google News？還是優化自己的程式碼？亦或是單純想找主人聊天？
 
-#### 🛡️ Kernel Guard (核心禁區) `v7.5 New`
+#### 🛡️ Kernel Guard (核心禁區)
 
 * **防護原理**：在 `index.js` 源碼中劃定了 `// === [KERNEL PROTECTED START] ===` 禁區。
 * **運作方式**：`PatchManager` 在應用任何 AI 生成的補丁前，會先掃描該補丁是否試圖修改禁區內的代碼（如安全過濾器）。一旦觸發，立即拋出異常並中止進化。
 
 ---
 
-## 💸 關於費用的秘密：如何達成 100% 免費？
+## 💸 關於費用的秘密：如何達成 100% 免費？ (The Zero-Cost Strategy)
 
 1. **平時運作 (0 元)**：
 * Golem 的「主大腦」使用的是 **Google Gemini Web 版** (gemini.google.com)。這是完全免費的。
