@@ -1,107 +1,129 @@
 #!/bin/bash
 
-# ========================================================
-# 🦞 Golem v7.1 (Tri-Brain Ultimate) Setup Script
-# ========================================================
+# 定義顏色，讓輸出更好看
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-echo "========================================================"
-echo "      🦞 Golem v7.1 (Tri-Brain Ultimate) 安裝精靈"
-echo "========================================================"
+echo -e "${CYAN}=======================================================${NC}"
+echo -e "${CYAN}  🦞 Golem v7.2 Setup (Hydra Dual-Link) - Pure Installer${NC}"
+echo -e "${CYAN}  Target: Linux / macOS${NC}"
+echo -e "${CYAN}  注意：本腳本僅安裝環境，請確保您已放入原始碼！${NC}"
+echo -e "${CYAN}=======================================================${NC}"
 echo ""
 
 # 1. 檢查 Node.js 環境
-echo "🔍 [1/5] 正在檢查 Node.js 環境..."
+echo -e "${GREEN}🔍 [1/6] Checking Node.js...${NC}"
 if ! command -v node &> /dev/null; then
-    echo "❌ [錯誤] 未偵測到 Node.js！"
-    echo "請前往 https://nodejs.org/ 下載並安裝 LTS 版本，或使用 nvm 安裝。"
+    echo -e "${RED}[ERROR] Node.js is not installed!${NC}"
+    echo "Please install Node.js from https://nodejs.org/"
     exit 1
 fi
-echo "   ✅ Node.js 已安裝 ($(node -v))。"
-
-# 2. 清理舊環境 (確保移除 Ollama 殘留)
+node -v
 echo ""
-echo "🧹 [2/5] 清理舊依賴與緩存..."
+
+# 2. 檢查使用者提供的原始碼 (關鍵步驟)
+echo -e "${GREEN}📂 [2/6] Verifying core files...${NC}"
+if [ ! -f "index.js" ]; then
+    echo -e "${RED}[嚴重錯誤] 找不到 index.js！${NC}"
+    echo -e "請將您完整版的 index.js 放入此資料夾後再執行。"
+    exit 1
+fi
+
+if [ ! -f "skills.js" ]; then
+    echo -e "${YELLOW}[提示] 找不到 skills.js，若您的 index.js 需要它，請記得放入。${NC}"
+else
+    echo -e "   ✅ Found skills.js"
+fi
+echo -e "   ✅ Found index.js (Using your provided version)"
+echo ""
+
+# 3. 清理舊環境
+echo -e "${GREEN}🧹 [3/6] Cleaning old environment...${NC}"
 if [ -d "node_modules" ]; then
-    echo "   - 正在刪除舊的 node_modules..."
+    echo "   - Removing old node_modules..."
     rm -rf node_modules
 fi
 if [ -f "package-lock.json" ]; then
-    echo "   - 正在刪除舊的 package-lock.json..."
     rm package-lock.json
 fi
-echo "   ✅ 環境清理完成。"
-
-# 3. 安裝新依賴
+echo -e "   ✅ Environment cleaned."
 echo ""
-echo "📦 [3/5] 正在下載 Golem v7.1 核心組件..."
-echo "   (這可能需要幾分鐘，請稍候...)"
-npm install
+
+# 4. 安裝依賴
+echo -e "${GREEN}📦 [4/6] Installing dependencies...${NC}"
+if [ ! -f "package.json" ]; then
+    npm init -y > /dev/null
+fi
+
+# 安裝 v7.2 所需套件 (含 discord.js)
+npm install dotenv node-telegram-bot-api discord.js puppeteer puppeteer-extra puppeteer-extra-plugin-stealth @google/generative-ai uuid
 
 if [ $? -ne 0 ]; then
-    echo ""
-    echo "❌ [錯誤] npm install 失敗！請檢查網路連線或權限。"
+    echo -e "${RED}[ERROR] npm install failed! Check your internet connection.${NC}"
     exit 1
 fi
-echo "   ✅ 依賴安裝完成。"
-
-# 4. 初始化記憶體與設定檔
+echo -e "   ✅ Dependencies installed."
 echo ""
-echo "🧠 [4/5] 初始化神經網路記憶體..."
+
+# 5. 下載瀏覽器核心
+echo -e "${GREEN}🌐 [5/6] Setting up Puppeteer Chrome...${NC}"
+npx puppeteer browsers install chrome
+echo -e "   ✅ Browser core ready."
+echo ""
+
+# 6. 初始化設定檔
+echo -e "${GREEN}🧠 [6/6] Configuring environment...${NC}"
 
 # 建立記憶體目錄
-if [ ! -d "golem_memory" ]; then
-    mkdir golem_memory
-    echo "   - 建立 golem_memory 資料夾"
-fi
+mkdir -p golem_memory
 
-# 初始化 JSON 檔案
-if [ ! -f "golem_persona.json" ]; then
-    echo "{}" > golem_persona.json
-fi
+# 初始化 JSON
 if [ ! -f "golem_learning.json" ]; then
     echo "{}" > golem_learning.json
 fi
 
-# 建立/檢查 .env
+# 建立 .env (若不存在)
 if [ ! -f ".env" ]; then
-    echo "   - 未偵測到 .env，正在建立預設設定檔..."
-    cat << EOF > .env
-# ==========================================
-# 🤖 Golem v7.1 環境配置檔
-# ==========================================
+    echo "   - Creating v7.2 Dual-Link .env template..."
+    cat <<EOT >> .env
+# ======================================================
+# 🧠 Golem Brain (Web Gemini API Keys)
+# ======================================================
+# 必填：用於自癒與視覺分析，支援多組 Key 用逗號分隔
+GEMINI_API_KEYS=
 
-# 1. Google Gemini API Keys (維修技師與自癒機制用)
-# 支援多組 Key 輪動，請用逗號分隔 (無空格)
-GEMINI_API_KEYS=填入你的Key1,填入你的Key2
+# ======================================================
+# ✈️ Telegram 設定 (左頭)
+# ======================================================
+TELEGRAM_TOKEN=
+ADMIN_ID=
 
-# 2. Telegram Bot Token
-TELEGRAM_TOKEN=填入你的BotToken
+# ======================================================
+# 👾 Discord 設定 (右頭)
+# ======================================================
+DISCORD_TOKEN=
+DISCORD_ADMIN_ID=
 
-# 3. 管理員 ID (安全性設定)
-ADMIN_ID=填入你的TelegramID
-
-# 4. 記憶體儲存路徑
+# ======================================================
+# ⚙️ 系統設定
+# ======================================================
 USER_DATA_DIR=./golem_memory
-
-# 5. 測試模式
 GOLEM_TEST_MODE=false
-EOF
-    echo "   ⚠️ 已建立 .env 檔案，請記得填入 API Key！"
+EOT
+    echo -e "   ⚠️ .env created! Don't forget to fill in your Tokens."
 else
-    echo "   ✅ .env 設定檔已存在。"
+    echo -e "   ✅ .env already exists (Skipping)."
 fi
 
-# 5. 完成
 echo ""
-echo "========================================================"
-echo "      🎉 Golem v7.1 部署就緒！"
-echo "========================================================"
+echo -e "${CYAN}=======================================================${NC}"
+echo -e "${GREEN}  🎉 Deployment Complete!${NC}"
+echo -e "${CYAN}=======================================================${NC}"
 echo ""
-echo "[下一步指引]"
-echo "1. 請使用編輯器打開 .env 檔案 (例如: nano .env)"
-echo "2. 填入 GEMINI_API_KEYS (必要！)"
-echo "3. 填入 TELEGRAM_TOKEN (必要！)"
-echo "4. 填入 ADMIN_ID (建議)"
-echo ""
-echo "設定完成後，請執行: npm start"
+echo -e "Next Steps:"
+echo -e "1. Edit config file:     ${YELLOW}nano .env${NC}"
+echo -e "2. Start the bot:        ${YELLOW}node index.js${NC}"
 echo ""
