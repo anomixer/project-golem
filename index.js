@@ -209,7 +209,7 @@ class HelpManager {
         let skillList = "基礎系統操作";
         try {
             skillList = Object.keys(skills).filter(k => k !== 'persona' && k !== 'getSystemPrompt').join(', ');
-        } catch(e) {}
+        } catch (e) { }
 
         return `
 🤖 **Golem v7.1 (Self-Healing) 自我診斷報告**
@@ -265,15 +265,15 @@ class DOMDoctor {
 
         console.log(`🚑 [Doctor] 正在診斷 UI 問題: 尋找 "${targetDescription}"...`);
         const safeHtml = htmlSnippet.length > 20000 ? htmlSnippet.substring(0, 20000) + "..." : htmlSnippet;
-        
+
         const prompt = `
-        你是 Puppeteer 自動化專家。
-        原本的 Selector 失效了。請分析下方的 HTML 片段。
-        【目標】找出代表 "${targetDescription}" (如輸入框、發送按鈕) 的最佳 CSS Selector。
-        【HTML】
-        ${safeHtml}
-        【要求】只回傳一個 CSS Selector 字串，不要解釋，不要 Markdown 格式。
-        `;
+你是 Puppeteer 自動化專家。
+原本的 Selector 失效了。請分析下方的 HTML 片段。
+【目標】找出代表 "${targetDescription}" (如輸入框、發送按鈕) 的最佳 CSS Selector。
+【HTML】
+${safeHtml}
+【要求】只回傳一個 CSS Selector 字串，不要解釋，不要 Markdown 格式。
+`;
 
         let attempts = 0;
         const maxAttempts = this.keyChain.keys.length;
@@ -345,6 +345,9 @@ class GolemBrain {
         if (!this.browser) await this.init();
 
         const tryInteract = async (sel) => {
+            // 0. 快照：紀錄發送前的氣泡數量 [⚡ FIX: 防止讀到舊回應]
+            const preCount = await this.page.evaluate(s => document.querySelectorAll(s).length, sel.response);
+
             // 1. 輸入
             await this.page.waitForSelector(sel.input, { timeout: 4000 });
             await this.page.evaluate((s, t) => {
@@ -364,12 +367,14 @@ class GolemBrain {
 
             if (isSystem) { await new Promise(r => setTimeout(r, 2000)); return ""; }
 
-            // 3. 等待
-            await this.page.waitForFunction(() => {
+            // 3. 等待 (邏輯升級：確保新氣泡出現且生成結束)
+            await this.page.waitForFunction((s, n) => {
+                const bubbles = document.querySelectorAll(s);
                 const stopBtn = document.querySelector('[aria-label="Stop generating"], [aria-label="停止產生"]');
                 const thinking = document.querySelector('.streaming-icon');
-                return !stopBtn && !thinking;
-            }, { timeout: 120000, polling: 1000 });
+                // 條件：氣泡數必須增加，且沒有在思考
+                return bubbles.length > n && !stopBtn && !thinking;
+            }, { timeout: 120000, polling: 1000 }, sel.response, preCount);
 
             // 4. 讀取
             return await this.page.evaluate((s) => {
@@ -435,7 +440,7 @@ class NodeRouter {
             await MessageManager.send(bot, chatId, HelpManager.getManual(), { parse_mode: 'Markdown' });
             return true;
         }
-        
+
         // 2. 稱呼設定
         if (text.startsWith('/callme')) {
             const newName = text.replace('/callme', '').trim();
@@ -449,7 +454,7 @@ class NodeRouter {
 
         // 3. Patch 意圖 (交給主循環)
         if (text.startsWith('/patch') || text.includes('優化代碼')) {
-             return false; 
+            return false;
         }
 
         return false;
@@ -480,11 +485,11 @@ class TaskController {
         let logBuffer = "";
         for (let i = startIndex; i < steps.length; i++) {
             const step = steps[i];
-            
+
             // 虛擬指令攔截 (v6.4 功能)
             if (step.cmd && step.cmd.trim() === 'golem-help') {
-                 await MessageManager.send(bot, chatId, HelpManager.getManual(), { parse_mode: 'Markdown' });
-                 continue;
+                await MessageManager.send(bot, chatId, HelpManager.getManual(), { parse_mode: 'Markdown' });
+                continue;
             }
 
             const risk = this.security.assess(step.cmd);
@@ -546,25 +551,25 @@ class AutonomyManager {
             const currentCode = Introspection.readSelf();
             const advice = memory.getAdvice();
             const prompt = `
-            【任務】自主進化提案 (Autonomy Evolution)
-            【角色】你是一個追求完美的 Node.js 專家。
-            【原始碼】\n${currentCode.slice(0, 15000)}\n
-            【記憶】${advice}
-            【要求】
-            1. 找出一個優化點 (效能、安全、功能)。
-            2. 務必輸出一個 JSON Array，包含 Patch 物件。
-            3. 格式範例：[{"type": "feature", "description": "說明", "search": "...", "replace": "..."}]
-            4. 請直接輸出 JSON，用 \`\`\`json 包覆。
-            `;
-            
+【任務】自主進化提案 (Autonomy Evolution)
+【角色】你是一個追求完美的 Node.js 專家。
+【原始碼】\n${currentCode.slice(0, 15000)}\n
+【記憶】${advice}
+【要求】
+1. 找出一個優化點 (效能、安全、功能)。
+2. 務必輸出一個 JSON Array，包含 Patch 物件。
+3. 格式範例：[{"type": "feature", "description": "說明", "search": "...", "replace": "..."}]
+4. 請直接輸出 JSON，用 \`\`\`json 包覆。
+`;
+
             const raw = await this.brain.sendMessage(prompt);
             const patches = ResponseParser.extractJson(raw);
-            
+
             if (patches.length > 0) {
                 const proposalType = patches[0].type || 'unknown';
                 memory.recordProposal(proposalType);
                 const testFile = PatchManager.createTestClone(__filename, patches);
-                
+
                 if (PatchManager.verify(testFile)) {
                     global.pendingPatch = testFile;
                     await MessageManager.send(this.bot, this.chatId, `💡 **自主進化提案** (${proposalType})\n內容：${patches[0].description}`, {
@@ -593,7 +598,7 @@ const autonomy = new AutonomyManager(bot, brain, CONFIG.ADMIN_ID);
     await brain.init();
     autonomy.start();
     console.log('📡 Golem v7.1 (Self-Healing) is Online.');
-    
+
     if (CONFIG.ADMIN_ID) {
         const p = skills.persona.get();
         if (p.isNew) await MessageManager.send(bot, CONFIG.ADMIN_ID, `🎉 系統啟動！我是 ${p.aiName}。`);
@@ -610,7 +615,7 @@ async function executeDeploy(chatId) {
         global.pendingPatch = null;
         memory.recordSuccess();
         await MessageManager.send(bot, chatId, "🚀 升級成功！正在重啟...");
-        
+
         // 🔄 Ouroboros Respawn
         const subprocess = spawn(process.argv[0], process.argv.slice(1), { detached: true, stdio: 'ignore' });
         subprocess.unref();
@@ -642,16 +647,16 @@ bot.on('message', async (msg) => {
 
     // 3. 手動 Patch 請求
     if (text.startsWith('/patch') || text.includes('優化代碼')) {
-         const req = text.replace('/patch', '').trim() || "優化代碼";
-         await MessageManager.send(bot, chatId, `🧬 收到進化請求: ${req}`);
-         
-         const currentCode = Introspection.readSelf();
-         const prompt = `【任務】代碼熱修復\n【需求】${req}\n【源碼】\n${currentCode.slice(0,12000)}\n【格式】輸出 JSON Array (Patch 格式)`;
-         
-         const raw = await brain.sendMessage(prompt);
-         const patches = ResponseParser.extractJson(raw);
-         
-         if (patches.length > 0) {
+        const req = text.replace('/patch', '').trim() || "優化代碼";
+        await MessageManager.send(bot, chatId, `🧬 收到進化請求: ${req}`);
+
+        const currentCode = Introspection.readSelf();
+        const prompt = `【任務】代碼熱修復\n【需求】${req}\n【源碼】\n${currentCode.slice(0, 12000)}\n【格式】輸出 JSON Array (Patch 格式)`;
+
+        const raw = await brain.sendMessage(prompt);
+        const patches = ResponseParser.extractJson(raw);
+
+        if (patches.length > 0) {
             const testFile = PatchManager.createTestClone(__filename, patches);
             if (PatchManager.verify(testFile)) {
                 global.pendingPatch = testFile;
@@ -660,15 +665,15 @@ bot.on('message', async (msg) => {
                 });
                 await bot.sendDocument(chatId, testFile);
             }
-         }
-         return;
+        }
+        return;
     }
 
     // 4. 一般對話 (進入大腦)
     bot.sendChatAction(chatId, 'typing');
     try {
         const raw = await brain.sendMessage(text);
-        
+
         // 解析回應：分離對話與指令
         const steps = ResponseParser.extractJson(raw);
         const chatPart = raw.replace(/```json[\s\S]*?```/g, '').replace(/\[\s*\{[\s\S]*\}\s*\]/g, '').trim();
@@ -687,7 +692,7 @@ bot.on('message', async (msg) => {
 bot.on('callback_query', async (query) => {
     const { id, data, message } = query;
     const chatId = message.chat.id;
-    
+
     if (data === 'PATCH_DEPLOY') { await executeDeploy(chatId); return bot.answerCallbackQuery(id); }
     if (data === 'PATCH_DROP') { await executeDrop(chatId); return bot.answerCallbackQuery(id); }
 
@@ -695,7 +700,7 @@ bot.on('callback_query', async (query) => {
         const [action, taskId] = data.split(':');
         const task = pendingTasks.get(taskId);
         if (!task) return bot.answerCallbackQuery(id, { text: '任務失效' });
-        
+
         await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: message.message_id });
         if (action === 'DENY') {
             pendingTasks.delete(taskId);
