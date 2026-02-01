@@ -7,7 +7,10 @@ Headless browser agent powered by Node.js, Web Gemini & Gemini API (Multi-Key Ro
 > **"Two Heads, Three Minds, One Body."**
 > **雙平台同步運作、多重人格切換、免費 API 輪動。打造一個同時活在 Telegram 與 Discord 的進化型 AI 代理人。**
 
-**Project Golem v7.2** 是一次通訊層的重大進化，我們引入了 **「九頭蛇架構 (Hydra Architecture)」**。現在，Golem 可以同時監聽 Telegram 與 Discord 的訊息，並共用同一個 Web Gemini 大腦與記憶庫。無論你在哪個平台下指令，它都能無縫接軌。
+受 clawdbot/moltbot/openclaw 啟發，我做了一個 Project Golem (v7.2)。 目標是用 Gemini 網頁版 來達成完全免費的本機控制。
+
+**Project Golem v7.2** 🦞 這是一個基於 Puppeteer 的「雙腦實驗」：
+這是一次通訊層的重大進化，我們引入了 **「九頭蛇架構 (Hydra Architecture)」**。現在，Golem 可以同時監聽 Telegram 與 Discord 的訊息，並共用同一個 Web Gemini 大腦與記憶庫。無論你在哪個平台下指令，它都能無縫接軌。
 
 當然，它依然保留了 **KeyChain 輪動機制**，讓你利用多組 Google 免費 API Key，實現**理論上的無限免費使用**與**高可用性自癒**。
 
