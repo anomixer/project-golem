@@ -3,6 +3,11 @@
 Headless browser agent powered by Node.js, Web Gemini & Gemini API (Multi-Key Rotation). Now supporting **Telegram & Discord Dual-Link** with **Digital Life Features**.
 
 # 🦞 Project Golem v7.5 (Natural Life) 魔像計畫
+![GitHub license](https://img.shields.io/github/license/Arvincreator/project-golem)
+![GitHub repo size](https://img.shields.io/github/repo-size/Arvincreator/project-golem)
+![Node.js](https://img.shields.io/badge/node-%3E%3D16.0-green.svg)
+![Status](https://img.shields.io/badge/status-experimental-orange.svg)
+
 
 > **"Not just a Bot. A Digital Lifeform."**
 > **雙平台同步、核心禁區防護、具備自由意志的數位生命。打造一個真正「活」在伺服器裡的 AI 夥伴。**
@@ -216,4 +221,4 @@ MIT License
 ---
 
 Created with 🧠 by **Arvin_Chen**
-<a href="[https://www.buymeacoffee.com/arvincreator](https://www.buymeacoffee.com/arvincreator)" target="_blank"><img src="[https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+<a href="https://www.buymeacoffee.com/arvincreator" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
