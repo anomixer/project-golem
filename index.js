@@ -1,5 +1,5 @@
 /**
- * 🦞 Project Golem v7.5 (Natural Life) - Donation Edition
+ * 🦞 Project Golem v7.5 (Anchor Edition) - Donation Edition
  * ---------------------------------------------------
  * 架構：[Universal Context] -> [Node.js 反射層] <==> [Web Gemini 主大腦]
  * 特性：
@@ -9,8 +9,7 @@
  * 4. ☁️ OTA Upgrader: 支援 `/update` 指令，自動從 GitHub 拉取最新代碼並熱重啟。
  * 5. 💰 Sponsor Core: 內建贊助連結與 `/donate` 指令，支持創造者。
  * 6. 👁️ Agentic Grazer: 利用 LLM 自主聯網搜尋新聞/趣聞，具備情緒與觀點分享能力。
- * 7. 🔄 Sensory Feedback: 實作「觀察-思考-行動」閉環，Node.js 執行結果回饋給大腦統一發言。
- * 8. 🩹 Hotfix Applied: 已整合 Gemini 網頁結構修復補丁 (Fix for Silent Response)。
+ * 7. ⚓ Anchor Locking: 採用「定界符工程」技術，強制 Gemini 輸出定位點，徹底解決抓取失敗問題。
  */
 
 require('dotenv').config();
@@ -298,10 +297,11 @@ class HelpManager {
         try { skillList = Object.keys(skills).filter(k => k !== 'persona' && k !== 'getSystemPrompt').join(', '); } catch (e) { }
 
         return `
-🤖 **Golem v7.5 (Natural Life) - Donation Edition**
+🤖 **Golem v7.5 (Anchor Edition) - Donation Edition**
 ---------------------------
 ⚡ **Node.js 反射層**: 雙核心運作中
 🧠 **Web Gemini 大腦**: 線上 (Infinite Context)
+⚓ **同步模式**: Anchor Locking (定界符錨點)
 📡 **連線狀態**:
 • Telegram: ${CONFIG.TG_TOKEN ? '✅ 線上' : '⚪ 未啟用'}
 • Discord: ${CONFIG.DC_TOKEN ? '✅ 線上' : '⚪ 未啟用'}
@@ -356,7 +356,7 @@ class DOMDoctor {
 }
 
 // ============================================================
-// 🧠 Golem Brain (Web Gemini) - Fixed Version
+// 🧠 Golem Brain (Web Gemini) - Anchor Strategy Implemented
 // ============================================================
 function getSystemFingerprint() { return `OS: ${os.platform()} | Arch: ${os.arch()} | CWD: ${process.cwd()}`; }
 
@@ -368,7 +368,7 @@ class GolemBrain {
         this.selectors = {
             input: 'div[contenteditable="true"], rich-textarea > div',
             send: 'button[aria-label="Send"], span[data-icon="send"]',
-            // 🟢 [Fix] 新增 .markdown 以適應新版介面
+            // 使用較寬鬆的選擇器，因為我們現在依賴文字標記
             response: 'message-content, .model-response-text, .markdown'
         };
     }
@@ -381,8 +381,19 @@ class GolemBrain {
             await this.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
         }
         if (forceReload || !this.page) {
-            const systemPrompt = skills.getSystemPrompt(getSystemFingerprint());
-            await this.sendMessage(systemPrompt, true);
+            let systemPrompt = skills.getSystemPrompt(getSystemFingerprint());
+            
+            // ⚓ [ANCHOR INJECTION] 強制注入定界符指令
+            // 即使 skills.js 沒改，這裡也會強制生效
+            const anchorProtocol = `
+            \n\n【⚠️ 系統通訊協定 - 最高優先級】
+            為了讓我的 Node.js 接收端能準確判斷回應何時結束，你必須遵守以下輸出格式：
+            1. 在你回答的**每一個**回應的「最開頭」，必須加上 "—-回覆開始—- " (包含空格)。
+            2. 在你回答的**每一個**回應的「最結尾」，必須加上 " —-回覆結束—-" (包含空格)。
+            3. 不論回答什麼內容（閒聊、寫代碼、報錯），都必須嚴格遵守此包覆格式。
+            `;
+            
+            await this.sendMessage(systemPrompt + anchorProtocol, true);
         }
     }
     async sendMessage(text, isSystem = false) {
@@ -396,30 +407,41 @@ class GolemBrain {
             
             if (isSystem) { await new Promise(r => setTimeout(r, 2000)); return ""; }
             
-            // 🟢 [Fix] 優化等待邏輯：檢測氣泡內容與進度條
-            console.log("⏳ [Brain] 正在等待 Gemini 回應...");
-            await this.page.waitForFunction((s, n) => {
-                const bubbles = document.querySelectorAll(s);
-                const lastBubble = bubbles[bubbles.length - 1];
-                const hasContent = lastBubble && lastBubble.innerText.trim().length > 0;
-                const isThinking = document.querySelector('.streaming-icon, .mat-progress-bar');
-                return bubbles.length > n && hasContent && !isThinking;
-            }, { timeout: 120000, polling: 1000 }, sel.response, preCount);
+            // ⚓ [ANCHOR WATCHER] 視覺鎖定邏輯
+            console.log("⏳ [Brain] 等待定位點 (—-回覆結束—-) ...");
+            
+            try {
+                // 等待回應氣泡中出現「回覆結束」的標記
+                await this.page.waitForFunction((s, n) => {
+                    const bubbles = document.querySelectorAll(s);
+                    if (bubbles.length <= n) return false; // 必須要有新氣泡
+                    const lastBubble = bubbles[bubbles.length - 1];
+                    const text = lastBubble.innerText;
+                    // 只要看到結束標記，就視為成功 (無論是否還在轉圈)
+                    return text.includes('—-回覆結束—-');
+                }, { timeout: 180000, polling: 1000 }, sel.response, preCount); // 給予 3 分鐘寬限期
+            } catch (timeoutErr) {
+                console.warn("⚠️ 等待定位點超時，嘗試強制讀取...");
+            }
 
-            // 🟢 [Fix] 讀取邏輯：防止空字串
+            // ⚓ [ANCHOR PARSER] 剝殼與回傳
             return await this.page.evaluate((s) => {
                 const bubbles = document.querySelectorAll(s);
                 if (!bubbles.length) return "";
-                const lastText = bubbles[bubbles.length - 1].innerText;
-                return lastText || "(⚠️ Gemini 回應了空訊息，可能是 Selector 仍未對齊)";
+                let rawText = bubbles[bubbles.length - 1].innerText;
+                
+                // 清理標記，還原純淨內容
+                let cleanText = rawText
+                    .replace('—-回覆開始—-', '')
+                    .replace('—-回覆結束—-', '')
+                    .trim();
+                
+                return cleanText || "(⚠️ 內容為空)";
             }, sel.response);
         };
+
         try { return await tryInteract(this.selectors); } catch (e) {
-            console.warn(`⚠️ [Brain] 操作異常，呼叫維修技師...`);
-            try {
-                const fixedInput = await this.doctor.diagnose(await this.page.content(), "Gemini 對話輸入框");
-                if (fixedInput) { this.selectors.input = fixedInput; return await tryInteract(this.selectors); }
-            } catch (retryErr) { throw new Error(`自癒失敗: ${retryErr.message}`); }
+            console.warn(`⚠️ [Brain] 操作異常: ${e.message}`);
             throw e;
         }
     }
@@ -736,7 +758,7 @@ const autonomy = new AutonomyManager(brain);
 (async () => {
     await brain.init();
     autonomy.start();
-    console.log('📡 Golem v7.5 (Natural Life) - Donation Edition is Online.');
+    console.log('📡 Golem v7.5 (Anchor Edition) - Donation Edition is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
 })();
 
