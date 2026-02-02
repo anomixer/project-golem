@@ -1,5 +1,5 @@
 /**
- * 🦞 Project Golem v7.5 (Anchor Edition) - Donation Edition
+ * 🦞 Project Golem v7.5.1 (Anchor Edition) - Donation Edition
  * ---------------------------------------------------
  * 架構：[Universal Context] -> [Node.js 反射層] <==> [Web Gemini 主大腦]
  * 特性：
