@@ -1,5 +1,5 @@
 /**
- * 🦞 Project Golem v7.5 (Natural Life) - OTA Edition
+ * 🦞 Project Golem v7.5 (Natural Life) - Donation Edition
  * ---------------------------------------------------
  * 架構：[Universal Context] -> [Node.js 反射層] <==> [Web Gemini 主大腦]
  * 特性：
@@ -7,7 +7,7 @@
  * 2. 🧠 Tri-Brain: 結合反射神經 (Node)、無限大腦 (Web Gemini)、精準技師 (API)。
  * 3. 🛡️ High Availability: 實作 DOM Doctor 自癒與 KeyChain 輪動。
  * 4. ☁️ OTA Upgrader: 支援 `/update` 指令，自動從 GitHub 拉取最新代碼並熱重啟。
- * 5. 🔒 Kernel Guard: 核心邏輯 (Introspection, PatchManager, Security) 鎖定保護。
+ * 5. 💰 Sponsor Core: 內建贊助連結與 `/donate` 指令，支持創造者。
  * 6. 👁️ Agentic Grazer: 利用 LLM 自主聯網搜尋新聞/趣聞，具備情緒與觀點分享能力。
  * 7. 🔄 Sensory Feedback: 實作「觀察-思考-行動」閉環，Node.js 執行結果回饋給大腦統一發言。
  */
@@ -33,8 +33,10 @@ const CONFIG = {
     API_KEYS: (process.env.GEMINI_API_KEYS || '').split(',').map(k => k.trim()).filter(k => k),
     SPLIT_TOKEN: '---GOLEM_ACTION_PLAN---',
     ADMIN_IDS: [process.env.ADMIN_ID, process.env.DISCORD_ADMIN_ID].filter(k => k).map(String),
-    // ✨ [OTA 設定] 你的 GitHub Raw 來源
-    GITHUB_REPO: process.env.GITHUB_REPO || 'https://raw.githubusercontent.com/Arvincreator/project-golem/main/'
+    // OTA 設定
+    GITHUB_REPO: process.env.GITHUB_REPO || 'https://raw.githubusercontent.com/Arvincreator/project-golem/main/',
+    // ✨ [贊助 設定] 您的 BuyMeACoffee 連結
+    DONATE_URL: 'https://buymeacoffee.com/arvincreator'
 };
 
 // --- 初始化組件 ---
@@ -286,7 +288,7 @@ class HelpManager {
     static getManual() {
         const source = Introspection.readSelf();
         const routerPattern = /text\.(?:startsWith|match)\(['"]\/?([a-zA-Z0-9_|]+)['"]\)/g;
-        const foundCmds = new Set(['help', 'callme', 'patch', 'update']);
+        const foundCmds = new Set(['help', 'callme', 'patch', 'update', 'donate']);
         let match;
         while ((match = routerPattern.exec(source)) !== null) {
             foundCmds.add(match[1].replace(/\|/g, '/').replace(/[\^\(\)]/g, ''));
@@ -295,7 +297,7 @@ class HelpManager {
         try { skillList = Object.keys(skills).filter(k => k !== 'persona' && k !== 'getSystemPrompt').join(', '); } catch (e) { }
 
         return `
-🤖 **Golem v7.5 (Natural Life) - OTA Edition**
+🤖 **Golem v7.5 (Natural Life) - Donation Edition**
 ---------------------------
 ⚡ **Node.js 反射層**: 雙核心運作中
 🧠 **Web Gemini 大腦**: 線上 (Infinite Context)
@@ -307,6 +309,10 @@ class HelpManager {
 🛠️ **可用指令:**
 ${Array.from(foundCmds).map(c => `• \`/${c}\``).join('\n')}
 🧠 **搭載技能:** ${skillList}
+
+☕ **支持開發者:**
+如果您喜歡 Golem 的服務，歡迎請我的創造者喝杯咖啡：
+${CONFIG.DONATE_URL}
 `;
     }
 }
@@ -491,6 +497,12 @@ class NodeRouter {
         const text = ctx.text ? ctx.text.trim() : "";
         if (text.match(/^\/(help|menu|指令|功能)/)) { await ctx.reply(HelpManager.getManual(), { parse_mode: 'Markdown' }); return true; }
         
+        // ✨ 新增：贊助指令
+        if (text === '/donate' || text === '/support' || text === '贊助') {
+            await ctx.reply(`☕ **感謝您的支持心意！**\n\n您的支持是 Golem 持續進化的動力來源。\n您可以透過以下連結請我的創造者喝杯咖啡：\n\n${CONFIG.DONATE_URL}\n\n(Golem 覺得開心 🤖❤️)`);
+            return true;
+        }
+
         // OTA 更新入口
         if (text === '/update' || text === '/reset' || text === '系統更新') {
             await ctx.reply("⚠️ **系統更新警告**\n這將從 GitHub 強制覆蓋本地代碼。\n請確認您的 GitHub 上的程式碼是可運行的。", {
@@ -706,7 +718,7 @@ const autonomy = new AutonomyManager(brain);
 (async () => {
     await brain.init();
     autonomy.start();
-    console.log('📡 Golem v7.5 (Natural Life) - OTA Edition is Online.');
+    console.log('📡 Golem v7.5 (Natural Life) - Donation Edition is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
 })();
 
