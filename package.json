@@ -1,29 +1,30 @@
 {
-  "name": "golem-v7-hydra",
-  "version": "7.2.0",
-  "description": "Golem v7.2: Hydra Dual-Link Architecture (Telegram + Discord + Web Gemini)",
+  "name": "project-golem",
+  "version": "7.6.0",
+  "description": "Golem v7.6 (Auto-Discovery Ultimate) - Dual-Stack AI Agent with Anchor Locking & Tool Discovery",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "GOLEM_TEST_MODE=true node index.js"
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "telegram-bot",
-    "discord-bot",
+    "golem",
     "gemini",
+    "telegram",
+    "discord",
     "puppeteer",
     "ai-agent",
-    "self-healing",
-    "hydra-architecture"
+    "auto-discovery"
   ],
-  "author": "Golem Architect",
+  "author": "Arvincreator",
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.2.1",
     "discord.js": "^14.14.1",
-    "dotenv": "^16.4.1",
-    "node-telegram-bot-api": "^0.64.0",
-    "puppeteer": "^22.0.0",
+    "dotenv": "^16.4.5",
+    "node-telegram-bot-api": "^0.65.1",
+    "puppeteer": "^22.6.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "uuid": "^9.0.1"
