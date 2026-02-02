@@ -91,7 +91,7 @@ graph TD
 
 #### 🧠 Experience Memory (經驗記憶體)
 
-* **長期記憶**：將「拒絕過的提案」與「失敗的嘗試」寫入 `golem_learning.json`。
+* **成長記憶**：將「拒絕過的成長提案」與「失敗的嘗試」寫入 `golem_learning.json`。
 * **行為矯正**：當 Golem 再次提出類似的錯誤方案時，會自動讀取記憶並自我警告：「⚠️ 注意：主人最近拒絕了這個方案...」。
 
 #### ☁️ OTA Upgrader (空中升級)
