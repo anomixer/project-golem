@@ -128,6 +128,15 @@ DISCORD_ADMIN_ID=
 USER_DATA_DIR=./golem_memory
 GOLEM_TEST_MODE=false
 # v8.0 Update: 無需設定 HuggingFace Token，模型將於首次啟動時自動下載
+
+# ======================================================
+# ☁️ OTA Update Config (空中升級設定)
+# ======================================================
+# 指定 /update 指令抓取原始碼的 GitHub 儲存庫
+# 預設若留空則使用：https://raw.githubusercontent.com/Arvincreator/project-golem/main/
+# 若您有 Fork 專案，請改為您自己的 Repo URL (結尾必須有斜線 /)
+
+GITHUB_REPO=
 EOT
     echo -e "   ⚠️ .env created! Don't forget to fill in your Tokens."
 else
