@@ -1,7 +1,7 @@
 # ========================
 # 1. 核心安全 (Security)
 # ========================
-# 環境變數與金鑰，絕對禁止上傳 [cite: 165]
+# 環境變數與金鑰，絕對禁止上傳
 .env
 
 # ========================
@@ -26,7 +26,7 @@ golem_learning.json
 # DOM Doctor 元素選擇器快取 
 golem_selectors.json
 
-# 人格狀態存檔 (Persona State) [cite: 15]
+# 人格狀態存檔 (Persona State) 
 # 若希望保留預設人格，建議提交 golem_persona.default.json，而忽略此運行時檔案
 golem_persona.json
 
