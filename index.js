@@ -1,5 +1,5 @@
 /**
- * 🦞 Project Golem v8.0 (Neural Memory) - Donation Edition
+ * 🦞 Project Golem v8.0 (Neural Memory) - Fix
  * ---------------------------------------------------
  * 架構：[Universal Context] -> [Node.js 反射層 + 本地海馬迴] <==> [Web Gemini 主大腦]
  * 特性：
