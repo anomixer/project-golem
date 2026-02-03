@@ -1,5 +1,5 @@
 /**
- * 🦞 Project Golem v8.0 (Neural Memory) - Fix
+ * 🦞 Project Golem v8.0 (Neural Memory) - Donation Edition
  * ---------------------------------------------------
  * 架構：[Universal Context] -> [Node.js 反射層 + 本地海馬迴] <==> [Web Gemini 主大腦]
  * 特性：
@@ -1020,11 +1020,19 @@ const controller = new TaskController();
 const autonomy = new AutonomyManager(brain);
 
 (async () => {
+    // 測試模式攔截器：防止在 CI/CD 或純邏輯測試時啟動瀏覽器
+    if (process.env.GOLEM_TEST_MODE === 'true') {
+        console.log('🚧 [System] GOLEM_TEST_MODE is active.');
+        console.log('🛑 Brain initialization & Browser launch skipped.');
+        console.log('✅ System syntax check passed.');
+        return;
+    }
+
     await brain.init();
     autonomy.start();
     console.log('📡 Golem v8.0 (Neural Memory) - Donation Edition is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
-})();
+})(); 
 // --- 統一事件處理 ---
 async function handleUnifiedMessage(ctx) {
     if (!ctx.text && !ctx.getAttachment()) return; // 沒文字也沒附件就退出
