@@ -132,6 +132,14 @@ if not exist .env (
         echo # 開發者除錯模式 (一般用戶請設為 false)
         echo GOLEM_TEST_MODE=false
         echo # v8.0 更新：不需要設定 HuggingFace Token，模型為本地自動下載
+        echo.
+        echo # ======================================================
+        echo # ☁️ OTA Update Config (空中升級設定)
+        echo # ======================================================
+        echo # 指定 /update 指令抓取原始碼的 GitHub 儲存庫
+        echo # 預設若留空則使用：https://raw.githubusercontent.com/Arvincreator/project-golem/main/
+        echo # 若您有 Fork 專案，請改為您自己的 Repo URL (結尾必須有斜線 /)
+        echo GITHUB_REPO=
     ) > .env
     echo    ⚠️ .env 已建立，請記得填入 Token！
 ) else (
