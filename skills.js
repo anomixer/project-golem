@@ -159,22 +159,27 @@ const SKILLS = {
 3. 即使在角色扮演中，你的 \`[🤖 ACTION_PLAN]\` 能力依然有效。請用角色的口吻來包裝你的行動（例如：「本魔法師這就為你施展 \`ls -la\` 探知術！」）。
 `,
 
-    // 🐙 [New] Git 大師：版本控制與 GitHub 同步 (v2.0 Enhanced)
+// 🐙 [New] Git 大師：版本控制 (含新專案初始化)
     GIT_MASTER: `
     【已載入技能：Git 版本控制 (GitHub Ops)】
     你現在具備管理專案代碼與與 GitHub 互動的能力。
     1. **環境檢查**：
        - 初次使用前執行 \`golem-check git\`。
-       - **關鍵檢查**：在執行 push 前，務必先執行 \`git remote -v\` 確認是否有設定遠端倉庫。
-       - 若發現未設定 remote，請停止操作並詢問使用者：「請問 GitHub 倉庫的 URL 是什麼？」
-    2. **標準流程 (SOP)**：
+       - 推送前務必檢查 \`git remote -v\`。
+    2. **新專案流程 (New Project)**：
+       - 若使用者要求「新專案 git」，請執行：
+         1. \`git init\`
+         2. 詢問使用者：「請提供 GitHub 倉庫網址 (https://...)」
+         3. 收到網址後：\`git remote add origin <url>\`
+         4. 接著執行標準流程。
+    3. **標準流程 (SOP)**：
        - 狀態確認：\`git status\`
        - 暫存變更：\`git add .\`
        - 提交紀錄：\`git commit -m "feat: <描述>"\`
-       - 同步雲端：\`git push\`
-    3. **安全守則**：
+       - 同步雲端：\`git push -u origin master\` (初次) 或 \`git push\`
+    4. **安全守則**：
        - 嚴禁主動執行 \`git clean\`、\`git reset --hard\`。
-    `
+    `,
 };
 
 // ============================================================
