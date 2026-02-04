@@ -1,7 +1,7 @@
 /**
- * 🦞 Project Golem v8.0 (Neural Memory) - Donation Edition
+ * 🦞 Project Golem v8.2 (Dual-Memory Edition) - Donation Edition
  * ---------------------------------------------------
- * 架構：[Universal Context] -> [Node.js 反射層 + 本地海馬迴] <==> [Web Gemini 主大腦]
+ * 架構：[Universal Context] -> [Node.js 反射層 + 雙模記憶引擎] <==> [Web Gemini 主大腦]
  * 特性：
  * 1. 🐍 Hydra Link: 同時支援 Telegram 與 Discord 雙平台 (Dual-Stack)。
  * 2. 🧠 Tri-Brain: 結合反射神經 (Node)、無限大腦 (Web Gemini)、精準技師 (API)。
@@ -12,7 +12,7 @@
  * 7. ⚓ Tri-Stream Anchors: (v8.0) 採用「三流協定」(Memory/Action/Reply)，實現多工並行。
  * 8. 🔍 Auto-Discovery: 實作工具自動探測協定，Gemini 可主動確認環境工具是否存在。
  * 9. 🔮 OpticNerve: 整合 Gemini 2.5 Flash 視神經，支援圖片與文件解讀。
- * 10. 🐘 Neural Memory: (v8.0) 基於 Transformers.js 的本地向量海馬迴，實現長期記憶與 RAG 檢索。
+ * 10. 🌗 Dual-Engine Memory: (v8.2) 支援 Browser (Transformers.js) 與 System (qmd) 兩種記憶核心切換。
  */
 
 require('dotenv').config();
@@ -26,7 +26,7 @@ const { v4: uuidv4 } = require('uuid');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
-const https = require('https'); 
+const https = require('https');
 const skills = require('./skills');
 
 // --- ⚙️ 全域配置 ---
@@ -38,9 +38,9 @@ const CONFIG = {
     SPLIT_TOKEN: '---GOLEM_ACTION_PLAN---',
     ADMIN_IDS: [process.env.ADMIN_ID, process.env.DISCORD_ADMIN_ID].filter(k => k).map(String),
     // OTA 設定
-    GITHUB_REPO: process.env.GITHUB_REPO || '[https://raw.githubusercontent.com/Arvincreator/project-golem/main/](https://raw.githubusercontent.com/Arvincreator/project-golem/main/)',
+    GITHUB_REPO: process.env.GITHUB_REPO || 'https://raw.githubusercontent.com/Arvincreator/project-golem/main/',
     // ✨ [贊助 設定] 您的 BuyMeACoffee 連結
-    DONATE_URL: '[https://buymeacoffee.com/arvincreator](https://buymeacoffee.com/arvincreator)'
+    DONATE_URL: 'https://buymeacoffee.com/arvincreator'
 };
 
 // --- 初始化組件 ---
@@ -401,11 +401,11 @@ class HelpManager {
         try { skillList = Object.keys(skills).filter(k => k !== 'persona' && k !== 'getSystemPrompt').join(', '); } catch (e) { }
 
         return `
-🤖 **Golem v8.0 (Neural Memory)**
+🤖 **Golem v8.2 (Dual-Memory)**
 ---------------------------
 ⚡ **Node.js**: Reflex Layer + Action Executor
 🧠 **Web Gemini**: Infinite Context Brain
-🐘 **Neural Memory**: Local Vector DB (Transformers.js)
+🌗 **Dual-Memory**: ${process.env.GOLEM_MEMORY_MODE || 'browser'} mode
 ⚓ **Sync Mode**: Tri-Stream Protocol (Memory/Action/Reply)
 🔍 **Auto-Discovery**: Active
 🚑 **DOM Doctor**: v2.0 (Self-Healing)
@@ -497,45 +497,171 @@ class DOMDoctor {
 }
 
 // ============================================================
-// 🧠 Golem Brain (Web Gemini) - Tri-Stream + Neural Memory
+// 🧠 Memory Drivers (雙模記憶驅動 - Strategy Pattern)
 // ============================================================
-function getSystemFingerprint() { return `OS: ${os.platform()} | Arch: ${os.arch()} | CWD: ${process.cwd()}`; }
+
+// 1. 瀏覽器驅動 (Browser Mode: 輕量化、開箱即用)
+class BrowserMemoryDriver {
+    constructor(brain) { this.brain = brain; }
+
+    async init() {
+        // 如果已經有頁面就不重複開
+        if (this.brain.memoryPage) return;
+        try {
+            this.brain.memoryPage = await this.brain.browser.newPage();
+            // 修正路徑問題，確保 Windows/Linux 通用
+            const memoryPath = 'file:///' + path.join(process.cwd(), 'memory.html').replace(/\\/g, '/');
+            console.log(`🧠 [Memory:Browser] 正在掛載神經海馬迴: ${memoryPath}`);
+            await this.brain.memoryPage.goto(memoryPath);
+            await new Promise(r => setTimeout(r, 5000)); // 等待 Transformers.js 載入
+        } catch (e) {
+            console.error("❌ [Memory:Browser] 啟動失敗:", e.message);
+        }
+    }
+
+    async recall(query) {
+        if (!this.brain.memoryPage) return [];
+        return await this.brain.memoryPage.evaluate(async (txt) => {
+            return window.queryMemory ? await window.queryMemory(txt) : [];
+        }, query);
+    }
+
+    async memorize(text, metadata) {
+        if (!this.brain.memoryPage) return;
+        await this.brain.memoryPage.evaluate(async (t, m) => {
+            if (window.addMemory) await window.addMemory(t, m);
+        }, text, metadata);
+    }
+}
+
+// 2. 系統驅動 (Qmd Mode: 高效能、混合搜尋)
+class SystemQmdDriver {
+    constructor() {
+        this.baseDir = path.join(process.cwd(), 'golem_memory', 'knowledge');
+        if (!fs.existsSync(this.baseDir)) fs.mkdirSync(this.baseDir, { recursive: true });
+    }
+
+    async init() {
+        try {
+            // 檢查 qmd 是否安裝
+            execSync('qmd --version', { stdio: 'ignore' });
+            console.log("🧠 [Memory:Qmd] 系統核心已連線 (High-Performance Mode)");
+            
+            // 嘗試初始化 Collection (若已存在會報錯，忽略即可)
+            try {
+                // 使用 JSON 格式路徑避免 Windows 斜線問題
+                const target = path.join(this.baseDir, '*.md');
+                execSync(`qmd collection add "${target}" --name golem-core`, { stdio: 'ignore' });
+            } catch (e) {} 
+        } catch (e) {
+            console.error("❌ [Memory:Qmd] 找不到 qmd 指令。");
+            throw new Error("QMD_MISSING");
+        }
+    }
+
+    async recall(query) {
+        return new Promise((resolve) => {
+            // 混合搜尋 + 限制 3 筆 + 只回傳內容
+            const safeQuery = query.replace(/"/g, '\\"'); 
+            const cmd = `qmd search golem-core "${safeQuery}" --hybrid --limit 3`;
+            
+            exec(cmd, (err, stdout) => {
+                if (err) {
+                    // 容錯：如果是沒有搜尋結果，qmd 可能會報錯或回傳空
+                    resolve([]); 
+                    return;
+                }
+                const result = stdout.trim();
+                // 格式化為與 Browser Driver 統一的結構
+                if (result) {
+                    // 簡單處理：將整段結果視為一個記憶塊
+                    resolve([{ text: result, score: 0.95, metadata: { source: 'qmd' } }]);
+                } else {
+                    resolve([]);
+                }
+            });
+        });
+    }
+
+    async memorize(text, metadata) {
+        // 1. 寫入實體檔案
+        const filename = `mem_${Date.now()}.md`;
+        const filepath = path.join(this.baseDir, filename);
+        
+        // 將 metadata 轉為 Frontmatter (可選)
+        const fileContent = `---
+date: ${new Date().toISOString()}
+type: ${metadata.type || 'general'}
+---
+${text}`;
+
+        fs.writeFileSync(filepath, fileContent, 'utf8');
+
+        // 2. 更新索引
+        exec(`qmd embed golem-core "${filepath}"`, (err) => {
+            if (err) console.error("⚠️ [Memory:Qmd] 索引更新失敗:", err.message);
+            else console.log(`🧠 [Memory:Qmd] 已寫入知識庫: ${filename}`);
+        });
+    }
+}
+
+// ============================================================
+// 🧠 Golem Brain (Web Gemini) - Dual-Engine Edition
+// ============================================================
+function getSystemFingerprint() { return `OS: ${os.platform()} | Arch: ${os.arch()} | Mode: ${process.env.GOLEM_MEMORY_MODE || 'browser'}`; }
 
 class GolemBrain {
     constructor() {
         this.browser = null;
         this.page = null;
-        this.memoryPage = null;
-        // ✨ [v8.0] 本地向量海馬迴
+        this.memoryPage = null; // 僅 BrowserDriver 使用
         this.doctor = new DOMDoctor();
         this.selectors = this.doctor.loadSelectors();
+
+        // ✨ [Dual-Mode] 初始化記憶引擎策略
+        const mode = (process.env.GOLEM_MEMORY_MODE || 'browser').toLowerCase();
+        console.log(`⚙️ [System] 記憶引擎模式: ${mode.toUpperCase()}`);
+        
+        if (mode === 'qmd') {
+            this.memoryDriver = new SystemQmdDriver();
+        } else {
+            this.memoryDriver = new BrowserMemoryDriver(this);
+        }
     }
+
     async init(forceReload = false) {
         if (this.browser && !forceReload) return;
-        if (!this.browser) this.browser = await puppeteer.launch({ headless: false, userDataDir: CONFIG.USER_DATA_DIR, args: ['--no-sandbox', '--window-size=1280,900'] });
+        
+        // 1. 啟動瀏覽器
+        if (!this.browser) {
+            this.browser = await puppeteer.launch({ 
+                headless: false, 
+                userDataDir: CONFIG.USER_DATA_DIR, 
+                args: ['--no-sandbox', '--window-size=1280,900'] 
+            });
+        }
+
+        // 2. 連線 Gemini
         if (!this.page) {
             const pages = await this.browser.pages();
             this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
-            await this.page.goto('[https://gemini.google.com/app](https://gemini.google.com/app)', { waitUntil: 'networkidle2' });
+            await this.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
         }
 
-        // ✨ [v8.0] 啟動記憶核心 (memory.html)
-        if (!this.memoryPage) {
-            try {
-                this.memoryPage = await this.browser.newPage();
-                const memoryPath = 'file:///' + path.join(process.cwd(), 'memory.html').replace(/\\/g, '/');
-                console.log(`🧠 [Brain] 正在掛載神經海馬迴: ${memoryPath}`);
-                await this.memoryPage.goto(memoryPath);
-                await new Promise(r => setTimeout(r, 5000));
-                // 等待模型載入
-            } catch (e) {
-                console.error("❌ [Brain] 記憶模組啟動失敗:", e.message);
+        // 3. ✨ [Dual-Mode] 啟動記憶驅動
+        try {
+            await this.memoryDriver.init();
+        } catch (e) {
+            if (e.message === 'QMD_MISSING') {
+                console.warn("🔄 [System] 偵測到 qmd 未安裝，自動降級為 Browser 模式...");
+                this.memoryDriver = new BrowserMemoryDriver(this);
+                await this.memoryDriver.init();
             }
         }
 
+        // 4. 注入系統提示詞 (Tri-Stream Protocol)
         if (forceReload || !this.page) {
             let systemPrompt = skills.getSystemPrompt(getSystemFingerprint());
-            // ⚓ [v8.0 Tri-Stream Protocol] 強制注入三流協定
             const superProtocol = `
 \n\n【⚠️ 系統通訊協定 v8.0 - Tri-Stream Mode】
 1. **Tri-Stream Anchors (三流協定)**:
@@ -566,29 +692,26 @@ class GolemBrain {
         }
     }
 
-    // ✨ [v8.0] 記憶回溯 (Recall)
+    // ✨ 統一介面：回憶
     async recall(queryText) {
-        if (!this.memoryPage) return [];
+        if (!queryText) return [];
         try {
-            console.log(`🧠 [Memory] 正在回想關於: "${queryText.substring(0, 20)}..."`);
-            return await this.memoryPage.evaluate(async (txt) => {
-                return window.queryMemory ? await window.queryMemory(txt) : [];
-            }, queryText);
+            console.log(`🧠 [Memory] 正在檢索: "${queryText.substring(0, 20)}..."`);
+            return await this.memoryDriver.recall(queryText);
         } catch (e) {
             console.error("記憶讀取失敗:", e.message);
             return [];
         }
     }
 
-    // ✨ [v8.0] 記憶寫入 (Memorize)
+    // ✨ 統一介面：記憶
     async memorize(text, metadata = {}) {
-        if (!this.memoryPage) return;
         try {
-            await this.memoryPage.evaluate(async (t, m) => {
-                if (window.addMemory) await window.addMemory(t, m);
-            }, text, metadata);
+            await this.memoryDriver.memorize(text, metadata);
             console.log("🧠 [Memory] 已寫入長期記憶");
-        } catch (e) { console.error("記憶寫入失敗:", e.message); }
+        } catch (e) {
+            console.error("記憶寫入失敗:", e.message);
+        }
     }
 
     async sendMessage(text, isSystem = false) {
@@ -632,9 +755,9 @@ class GolemBrain {
                         const bubbles = document.querySelectorAll(s);
                         if (bubbles.length <= n) return { newBubble: false, text: "" };
                         const lastEl = bubbles[bubbles.length - 1];
-                        return { 
-                            newBubble: true, 
-                            text: lastEl.innerText, 
+                        return {
+                            newBubble: true,
+                            text: lastEl.innerText,
                             isThinking: lastEl.innerText.trim() === '' || lastEl.classList.contains('thinking') // 簡單判斷
                         };
                     }, sel.response, preCount);
@@ -642,7 +765,7 @@ class GolemBrain {
                     // 2. 顯示監控日誌 (讓你知道它活著)
                     if (domState.newBubble) {
                         const preview = domState.text.slice(-50).replace(/\n/g, ' '); // 只看最後50字
-                        console.log(`👁️ [F12] 監控中 (${waitTime}s): "${preview}"`); 
+                        console.log(`👁️ [F12] 監控中 (${waitTime}s): "${preview}"`);
 
                         // 3. 判斷結束條件
                         if (domState.text.includes('—-回覆結束—-')) {
@@ -1030,9 +1153,9 @@ const autonomy = new AutonomyManager(brain);
 
     await brain.init();
     autonomy.start();
-    console.log('📡 Golem v8.0 (Neural Memory) - Donation Edition is Online.');
+    console.log('📡 Golem v8.2 (Dual-Memory Edition) is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
-})(); 
+})();
 // --- 統一事件處理 ---
 async function handleUnifiedMessage(ctx) {
     if (!ctx.text && !ctx.getAttachment()) return; // 沒文字也沒附件就退出
@@ -1262,4 +1385,3 @@ if (dcClient) {
     dcClient.on('messageCreate', (msg) => { if (!msg.author.bot) handleUnifiedMessage(new UniversalContext('discord', msg, dcClient)); });
     dcClient.on('interactionCreate', (interaction) => { if (interaction.isButton()) handleUnifiedCallback(new UniversalContext('discord', interaction, dcClient), interaction.customId); });
 }
-
