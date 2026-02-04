@@ -152,6 +152,17 @@ TELEGRAM_TOKEN=123...
 npm start
 
 ```
+或 啟動監測儀表板（Dashboard)
+
+```bash
+npm start dashboard
+
+```
+ps.如果你要啟動儀表板必須要先安裝終端機套件
+
+```bash
+npm install blessed blessed-contrib
+```
 
 ---
 
