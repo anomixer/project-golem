@@ -1,7 +1,7 @@
 {
   "name": "project-golem",
-  "version": "8.0.0",
-  "description": "Project Golem v8.0 (Neural Memory Edition) - Auto-Discovery & RAG Integrated",
+  "version": "8.2.0",
+  "description": "Project Golem v8.2 (Dual-Memory Edition) - Auto-Discovery, RAG & Hydra Link",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -14,13 +14,14 @@
     "puppeteer",
     "gemini",
     "neural-memory",
+    "qmd",
     "discord",
     "telegram"
   ],
   "author": "Arvincreator",
   "license": "MIT",
   "dependencies": {
-    "@google/generative-ai": "^0.2.1",
+    "@google/generative-ai": "^0.21.0",
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.5",
     "node-telegram-bot-api": "^0.65.1",
