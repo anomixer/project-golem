@@ -158,6 +158,11 @@ npm start
 npm start dashboard
 
 ```
+ps.如果你要啟動儀表板必須要先安裝終端機套件
+
+```bash
+npm install blessed blessed-contrib
+```
 
 ---
 
