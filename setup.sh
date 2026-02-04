@@ -1,156 +1,140 @@
 #!/bin/bash
 
+# ==========================================================
+# 🦞 Project Golem v8.2 - Mac/Linux 安裝精靈
+# ==========================================================
+
 # 定義顏色
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}=======================================================${NC}"
-echo -e "${CYAN}  🦞 Golem v8.0 Setup - Neural Memory Edition${NC}"
-echo -e "${CYAN}  Target: Linux / macOS${NC}"
-echo -e "${CYAN}  Architecture: Node.js + Puppeteer (Transformers.js)${NC}"
-echo -e "${CYAN}=======================================================${NC}"
+echo -e "${CYAN}==========================================================${NC}"
+echo -e "${CYAN}🦞 Project Golem v8.2 - 全自動安裝精靈 (Mac/Linux)${NC}"
+echo -e "${CYAN}==========================================================${NC}"
 echo ""
 
-# 1. 檢查 Node.js 環境
-echo -e "${GREEN}🔍 [1/6] Checking Node.js...${NC}"
+# ------------------------------------------------------------
+# 0. 檔案完整性檢查
+# ------------------------------------------------------------
+echo -e "[1/5] 正在檢查核心檔案完整性..."
+REQUIRED_FILES=("index.js" "skills.js" "package.json" "memory.html")
+MISSING_FILES=()
+
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+        MISSING_FILES+=("$file")
+    fi
+done
+
+if [ ${#MISSING_FILES[@]} -ne 0 ]; then
+    echo -e "${RED}❌ 錯誤：核心檔案遺失！${NC}"
+    echo "遺失檔案: ${MISSING_FILES[*]}"
+    exit 1
+fi
+echo -e "${GREEN}✅ 核心檔案檢查通過。${NC}"
+echo ""
+
+# ------------------------------------------------------------
+# 1. 檢查 Node.js
+# ------------------------------------------------------------
+echo -e "[2/5] 正在檢查 Node.js 環境..."
 if ! command -v node &> /dev/null; then
-    echo -e "${RED}[ERROR] Node.js is not installed!${NC}"
-    echo "Please install Node.js (v18+) from https://nodejs.org/"
+    echo -e "${RED}❌ 找不到 Node.js！${NC}"
+    echo -e "${YELLOW}請使用以下方式安裝 (建議 v18+)：${NC}"
+    echo " - macOS: brew install node"
+    echo " - Linux: curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs"
+    echo " - 通用 (推薦): 使用 nvm (https://github.com/nvm-sh/nvm)"
     exit 1
 fi
-node -v
+echo -e "${GREEN}✅ Node.js 已安裝 ($(node -v))。${NC}"
 echo ""
 
-# 2. 檢查使用者提供的原始碼 (v8.0 關鍵步驟)
-echo -e "${GREEN}📂 [2/6] Verifying core files...${NC}"
-
-# 檢查 index.js
-if [ ! -f "index.js" ]; then
-    echo -e "${RED}[嚴重錯誤] 找不到 index.js！${NC}"
-    echo -e "請將 v8.0 版的 index.js 放入此資料夾後再執行。"
-    exit 1
-fi
-
-# 檢查 memory.html (v8.0 新增)
-if [ ! -f "memory.html" ]; then
-    echo -e "${RED}[嚴重錯誤] 找不到 memory.html！${NC}"
-    echo -e "${YELLOW}這是 v8.0 的「神經海馬迴」核心檔案，缺少它將無法運作。${NC}"
-    echo -e "請確保 memory.html 與 index.js 位於同一目錄。"
-    exit 1
-else
-    echo -e "   ✅ Found memory.html (Neural Cortex)"
-fi
-
-# 檢查 skills.js
-if [ ! -f "skills.js" ]; then
-    echo -e "${YELLOW}[提示] 找不到 skills.js，若您的版本需要它，請記得放入。${NC}"
-else
-    echo -e "   ✅ Found skills.js"
-fi
-echo -e "   ✅ Found index.js (Core)"
-echo ""
-
-# 3. 清理舊環境
-echo -e "${GREEN}🧹 [3/6] Cleaning old environment...${NC}"
-if [ -d "node_modules" ]; then
-    echo "   - Removing old node_modules (ensuring clean install)..."
-    rm -rf node_modules
-fi
-if [ -f "package-lock.json" ]; then
-    rm package-lock.json
-fi
-echo -e "   ✅ Environment cleaned."
-echo ""
-
-# 4. 安裝依賴
-echo -e "${GREEN}📦 [4/6] Installing dependencies...${NC}"
-if [ ! -f "package.json" ]; then
-    echo "   - Initializing package.json..."
-    npm init -y > /dev/null
-fi
-
-# 安裝 v8.0 所需套件 (含 discord.js, uuid, google-ai)
-npm install dotenv node-telegram-bot-api discord.js puppeteer puppeteer-extra puppeteer-extra-plugin-stealth @google/generative-ai uuid
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}[ERROR] npm install failed! Check your internet connection.${NC}"
-    exit 1
-fi
-echo -e "   ✅ Dependencies installed."
-echo ""
-
-# 5. 下載瀏覽器核心
-echo -e "${GREEN}🌐 [5/6] Setting up Puppeteer Chrome...${NC}"
-echo "   - This browser instance hosts the Neural Memory & Web Gemini."
-npx puppeteer browsers install chrome
-echo -e "   ✅ Browser core ready."
-echo ""
-
-# 6. 初始化設定檔
-echo -e "${GREEN}🧠 [6/6] Configuring environment...${NC}"
-
-# 建立記憶體目錄
-mkdir -p golem_memory
-
-# 初始化 JSON
-if [ ! -f "golem_learning.json" ]; then
-    echo "{}" > golem_learning.json
-fi
-
-# 建立 .env (若不存在)
+# ------------------------------------------------------------
+# 2. 設定環境變數 (.env)
+# ------------------------------------------------------------
+echo -e "[3/5] 正在設定環境變數 (.env)..."
 if [ ! -f ".env" ]; then
-    echo "   - Creating v8.0 .env template..."
-    cat <<EOT >> .env
-# ======================================================
-# 🧠 Golem Brain (Web Gemini API Keys)
-# ======================================================
-# 必填：用於自癒與視覺分析 (OpticNerve)，支援多組 Key 用逗號分隔
-GEMINI_API_KEYS=
-
-# ======================================================
-# ✈️ Telegram 設定 (左腦)
-# ======================================================
-TELEGRAM_TOKEN=
-ADMIN_ID=
-
-# ======================================================
-# 👾 Discord 設定 (右腦)
-# ======================================================
-DISCORD_TOKEN=
-DISCORD_ADMIN_ID=
-
-# ======================================================
-# ⚙️ 系統設定
-# ======================================================
-USER_DATA_DIR=./golem_memory
-GOLEM_TEST_MODE=false
-# v8.0 Update: 無需設定 HuggingFace Token，模型將於首次啟動時自動下載
-
-# ======================================================
-# ☁️ OTA Update Config (空中升級設定)
-# ======================================================
-# 指定 /update 指令抓取原始碼的 GitHub 儲存庫
-# 預設若留空則使用：https://raw.githubusercontent.com/Arvincreator/project-golem/main/
-# 若您有 Fork 專案，請改為您自己的 Repo URL (結尾必須有斜線 /)
-
-GITHUB_REPO=
-EOT
-    echo -e "   ⚠️ .env created! Don't forget to fill in your Tokens."
+    if [ -f ".env.example" ]; then
+        cp .env.example .env
+        echo -e "${GREEN}✅ 已從範本建立 .env 檔案。${NC}"
+    else
+        echo -e "${YELLOW}⚠️ 找不到 .env.example，跳過。${NC}"
+    fi
 else
-    echo -e "   ✅ .env already exists (Skipping)."
+    echo -e "${GREEN}✅ .env 已存在。${NC}"
+fi
+echo ""
+
+# ------------------------------------------------------------
+# 3. 安裝 NPM 依賴
+# ------------------------------------------------------------
+echo -e "[4/5] 正在安裝核心依賴 (NPM Install)..."
+npm install
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ NPM 安裝失敗。請檢查網路連線。${NC}"
+    exit 1
+fi
+echo ""
+
+# ------------------------------------------------------------
+# 4. 選擇記憶引擎
+# ------------------------------------------------------------
+echo -e "[5/5] 請選擇 Golem 的記憶引擎模式："
+echo "=========================================================="
+echo " [1] 🌐 瀏覽器模式 (預設) - 適合新手，無須設定。"
+echo " [2] 🚀 系統模式 (qmd)   - 高效能，需安裝 Bun/qmd。"
+echo "=========================================================="
+echo ""
+
+read -p "👉 請輸入選項 [1 或 2] (預設 1): " MODE
+
+# 輔助函式：修改 .env (相容 macOS 與 Linux sed 差異)
+update_env() {
+    local key="GOLEM_MEMORY_MODE"
+    local value="$1"
+    # 如果 .env 裡還沒有這個 key，就追加；如果有，就取代
+    if grep -q "^$key=" .env; then
+        # 判斷系統是否為 macOS (Darwin)
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/^$key=.*/$key=$value/" .env
+        else
+            sed -i "s/^$key=.*/$key=$value/" .env
+        fi
+    else
+        echo "$key=$value" >> .env
+    fi
+}
+
+if [ "$MODE" == "2" ]; then
+    echo ""
+    echo -e "${CYAN}⚙️ 配置為：系統模式 (qmd)...${NC}"
+    
+    # 檢查 Bun
+    if ! command -v bun &> /dev/null; then
+        echo -e "${YELLOW}📦 正在自動安裝 Bun...${NC}"
+        curl -fsSL https://bun.sh/install | bash
+        
+        # 暫時加入 PATH 以便立即使用 (針對本次 Session)
+        export BUN_INSTALL="$HOME/.bun"
+        export PATH="$BUN_INSTALL/bin:$PATH"
+    fi
+    
+    # 安裝 qmd
+    echo -e "${YELLOW}📦 正在安裝 qmd...${NC}"
+    bun install -g https://github.com/tobi/qmd
+    
+    update_env "qmd"
+else
+    echo ""
+    echo -e "${CYAN}⚙️ 配置為：瀏覽器模式...${NC}"
+    update_env "browser"
 fi
 
 echo ""
-echo -e "${CYAN}=======================================================${NC}"
-echo -e "${GREEN}  🎉 Deployment Complete! (v8.0 Neural Memory)${NC}"
-echo -e "${CYAN}=======================================================${NC}"
-echo ""
-echo -e "Next Steps:"
-echo -e "1. Edit config file:     ${YELLOW}nano .env${NC}"
-echo -e "2. Start the bot:        ${YELLOW}node index.js${NC}"
-echo ""
-echo -e "${YELLOW}Note: The first startup will download the AI model (~50MB). Please wait.${NC}"
-echo ""
+echo -e "${GREEN}==========================================================${NC}"
+echo -e "${GREEN}🎉 安裝完成！${NC}"
+echo -e "🚀 請輸入 ${YELLOW}npm start${NC} 啟動 Golem。"
+echo -e "${GREEN}==========================================================${NC}"
