@@ -1,12 +1,18 @@
-// 檔案名稱: dashboard.js
-// 版本: v2.0 (含熱切換與說明列)
+/**
+ * 檔案名稱: dashboard.js
+ * 版本: v8.5 (Neuro-Link Monitor Edition)
+ * ---------------------------------------
+ * 更新重點：
+ * 1. 支援 Neuro-Link 雙軌訊號的色彩高亮 (CDP vs DOM)。
+ * 2. 狀態面板新增 Neuro-Link 狀態指示。
+ */
 const blessed = require('blessed');
 const contrib = require('blessed-contrib');
 const os = require('os');
 
 class DashboardPlugin {
     constructor() {
-        // 1. 保存原始的 Console 方法 (為了之後還原)
+        // 1. 保存原始的 Console 方法
         this.originalLog = console.log;
         this.originalError = console.error;
         this.isDetached = false;
@@ -14,11 +20,11 @@ class DashboardPlugin {
         // 2. 初始化螢幕
         this.screen = blessed.screen({
             smartCSR: true,
-            title: '🦞 Golem v8.2 戰術控制台',
-            fullUnicode: true // 確保中文顯示正常
+            title: '🦞 Golem v8.5 戰術控制台 (Neuro-Link)',
+            fullUnicode: true
         });
 
-        // 3. 建立網格 (留最下面一行給說明列，所以 rows 設為 12，但主要元件只用到 11)
+        // 3. 建立網格
         this.grid = new contrib.grid({ rows: 12, cols: 12, screen: this.screen });
 
         // --- 介面元件佈局 ---
@@ -30,11 +36,12 @@ class DashboardPlugin {
             showLegend: true
         });
 
-        // 左下：系統日誌 (高度縮減 1 格給 footer)
+        // 左下：核心日誌 (升級：支援 Neuro-Link 高亮)
         this.logBox = this.grid.set(4, 0, 7, 6, contrib.log, {
             fg: "green",
             selectedFg: "lightgreen",
-            label: '📠 核心日誌 (System Logs)'
+            label: '📠 神經網路日誌 (Neuro-Link Logs)',
+            tags: true // 啟用顏色標籤解析
         });
 
         // 右上：狀態面板
@@ -43,25 +50,22 @@ class DashboardPlugin {
             style: { border: { fg: 'cyan' } }
         });
 
-        // 右下：三流協定 (高度縮減 1 格給 footer)
+        // 右下：三流協定
         this.chatBox = this.grid.set(4, 6, 7, 6, contrib.log, {
             fg: "white",
             selectedFg: "cyan",
             label: '💬 三流協定 (對話/行動)'
         });
 
-        // --- 底部說明列 (Footer) ---
+        // --- 底部說明列 ---
         this.footer = blessed.box({
             parent: this.screen,
             bottom: 0,
             left: 0,
             width: '100%',
             height: 1,
-            content: ' {bold}F12{/bold}: 關閉畫面(不停止程式) | {bold}Ctrl+C{/bold}: 完全停止程式 | {bold}Dashboard v2.0{/bold} ',
-            style: {
-                fg: 'black',
-                bg: 'cyan'
-            },
+            content: ' {bold}F12{/bold}: 關閉畫面(不停止程式) | {bold}Ctrl+C{/bold}: 完全停止 | {bold}v8.5 Neuro-Link{/bold} ',
+            style: { fg: 'black', bg: 'cyan' },
             tags: true
         });
 
@@ -78,31 +82,50 @@ class DashboardPlugin {
 
     // 設定按鍵監聽
     setupKeys() {
-        // 1. 完全停止 (Kill Process)
         this.screen.key(['C-c', 'q'], () => {
             this.screen.destroy();
-            console.log = this.originalLog; // 恢復 console 以免報錯
+            console.log = this.originalLog;
+            console.error = this.originalError; // 修正變數名稱錯誤
             console.log("🛑 Golem 系統已完全終止。");
             process.exit(0);
         });
 
-        // 2. 熱切換 (Detach UI) - 關閉畫面但保留程式
         this.screen.key(['f12'], () => {
             this.detach();
         });
     }
 
-    // 核心：劫持 console
+    // 核心：劫持 console (v8.5 增強版)
     setupOverride() {
         console.log = (...args) => {
-            if (this.isDetached) return this.originalLog(...args); // 如果已脫離，直接用原本的
+            if (this.isDetached) return this.originalLog(...args);
 
-            const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+            let msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+
+            // --- v8.5 Neuro-Link 色彩增強邏輯 ---
+            let logMsg = msg;
             
-            // 寫入 Dashboard 元件
-            if (this.logBox) this.logBox.log(msg);
+            // 1. CDP 網路層訊號 (Cyan/Blue)
+            if (msg.includes('[CDP]')) {
+                logMsg = `{cyan-fg}${msg}{/cyan-fg}`;
+            }
+            // 2. DOM 視覺層訊號 (Yellow)
+            else if (msg.includes('[DOM]') || msg.includes('[F12]')) {
+                logMsg = `{yellow-fg}${msg}{/yellow-fg}`;
+            }
+            // 3. Brain 決策訊號 (Magenta)
+            else if (msg.includes('[Brain]')) {
+                logMsg = `{magenta-fg}${msg}{/magenta-fg}`;
+            }
+            // 4. OpticNerve 視覺訊號 (Blue)
+            else if (msg.includes('[OpticNerve]') || msg.includes('[Vision]')) {
+                logMsg = `{blue-fg}${msg}{/blue-fg}`;
+            }
 
-            // 分流邏輯
+            // 寫入日誌面板
+            if (this.logBox) this.logBox.log(logMsg);
+
+            // 分流邏輯 (ChatBox)
             if (msg.includes('[💬 REPLY]') || msg.includes('—-回覆開始—-')) {
                 const text = msg.replace('[💬 REPLY]', '').replace('—-回覆開始—-','').substring(0, 60);
                 if (this.chatBox) this.chatBox.log(`\x1b[36m[回覆]\x1b[0m ${text}...`);
@@ -118,19 +141,15 @@ class DashboardPlugin {
         console.error = (...args) => {
             if (this.isDetached) return this.originalError(...args);
             const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
-            if (this.logBox) this.logBox.log(`\x1b[31m[錯誤]\x1b[0m ${msg}`);
+            if (this.logBox) this.logBox.log(`{red-fg}[錯誤] ${msg}{/red-fg}`);
         };
     }
 
-    // 脫離模式：銷毀 UI 並還原 Console
     detach() {
         this.isDetached = true;
-        this.screen.destroy(); // 銷毀 blessed 實例
-        
-        // 還原原生 console
+        this.screen.destroy();
         console.log = this.originalLog;
         console.error = this.originalError;
-
         console.log("\n============================================");
         console.log("📺 Dashboard 已關閉 (Visual Interface Detached)");
         console.log("🤖 Golem 仍在背景執行中...");
@@ -139,24 +158,26 @@ class DashboardPlugin {
 
     startMonitoring() {
         this.timer = setInterval(() => {
-            if (this.isDetached) return clearInterval(this.timer); // 脫離後停止更新 UI
+            if (this.isDetached) return clearInterval(this.timer);
 
             const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
             this.memData.y.shift();
             this.memData.y.push(memUsage);
             this.cpuLine.setData([this.memData]);
-            
+
             const mode = process.env.GOLEM_MEMORY_MODE || 'Browser';
             const uptime = Math.floor(process.uptime());
             const hours = Math.floor(uptime / 3600);
             const minutes = Math.floor((uptime % 3600) / 60);
-            
+
+            // 狀態面板更新 (加入 Neuro-Link 狀態)
             this.statusBox.setMarkdown(`
 # 核心狀態
 - **模式**: ${mode}
 - **記憶體**: ${memUsage.toFixed(0)} MB
 - **運行**: ${hours}h ${minutes}m
-            `);
+- **連結**: 🟢 Neuro-Link (Dual)
+`);
             this.screen.render();
         }, 1000);
     }
