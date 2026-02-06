@@ -47,7 +47,8 @@ if (SEARCH_1.test(content)) {
     content = content.replace(SEARCH_1, REPLACE_1);
     console.log("✅ [1/3] 已注入內容指紋快照邏輯 (staleText)");
 } else {
-    [cite_start]console.warn("⚠️ [1/3] 找不到 preCount 定義，請確認 index.js 是否為原始版本 [cite: 1]。");
+    // 這裡原本有引用標記，現在已移除
+    console.warn("⚠️ [1/3] 找不到 preCount 定義，請確認 index.js 是否為原始版本。");
 }
 
 // ============================================================
