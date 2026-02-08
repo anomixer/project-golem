@@ -1,6 +1,18 @@
 <a href="https://www.buymeacoffee.com/arvincreator" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
-# 🦞 Project Golem v8.5 (Web Neuro-Link Edition)
+# 🦞 Project Golem v8.5 (Titan Edition)
+ * ---------------------------------------------------
+ * 架構：[Universal Context] -> [Node.js 反射層 + 雙模記憶引擎] <==> [Web Gemini 主大腦]
+ * 核心升級：
+ * 1. 🛡️ Titan Protocol: 採用純英文大寫標籤 ([GOLEM_ACTION])，移除 Emoji 降低解析干擾。
+ * 2. 🥪 Envelope Lock: 實作「三明治信封」鎖定機制 ([[BEGIN]]...[[END]])，徹底解決非同步競態與截斷問題。
+ * 3. ⚡ Robust Parser: 寬鬆格式解析器，支援斷尾 JSON 修復與模糊匹配。
+ * ---------------------------------------------------
+ * 原有特性保留：
+ * 🐍 Hydra Link | 🧠 Tri-Brain | 🛡️ High Availability | ☁️ OTA Upgrader
+ * 💰 Sponsor Core | 👁️ Agentic Grazer | 🔍 Auto-Discovery | 🔮 OpticNerve
+ * 🌗 Dual-Engine Memory | ⚡ Neuro-Link (CDP Integration)
+ */
 
 > **"I perceive, therefore I act."**
 > **搭載「網頁神經連結 (Web Neuro-Link)」技術的自律型 AI 代理人。**
