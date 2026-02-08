@@ -1,7 +1,7 @@
 <a href="https://www.buymeacoffee.com/arvincreator" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
 # 🦞 Project Golem v8.5 (Titan Edition)
- * ---------------------------------------------------
+---------------------------------------------------
  * 架構：[Universal Context] -> [Node.js 反射層 + 雙模記憶引擎] <==> [Web Gemini 主大腦]
  * 核心升級：
  * 1. 🛡️ Titan Protocol: 採用純英文大寫標籤 ([GOLEM_ACTION])，移除 Emoji 降低解析干擾。
