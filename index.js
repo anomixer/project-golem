@@ -454,23 +454,26 @@ class DOMDoctor {
             console.log("💾 [Doctor] Selector 已更新並存檔！");
         } catch (e) { }
     }
-    async diagnose(htmlSnippet, targetType) {
+ async diagnose(htmlSnippet, targetType) {
     if (this.keyChain.keys.length === 0) return null;
-    
+
+    // 策略 1: 優化提示詞，教 AI 像人類一樣「往上找容器」
     const hints = {
-      'input': '找尋一個可以輸入文字的區域。特徵通常包含: contenteditable="true", role="textbox", textarea, 或 class 包含 "editor", "input".',
-      'send': '找尋發送訊息的按鈕。特徵通常包含: aria-label="Send", data-icon="send", 或包含 SVG icon 的 button。',
+      'input': '目標是輸入框。⚠️ 注意：請忽略內層的 <p>, <span> 或 text node。請往上尋找最近的一個「容器 div」，它通常具備 contenteditable="true"、role="textbox" 或 class="ql-editor" 屬性。',
+      'send': '目標是發送按鈕。⚠️ 注意：請找出外層的 <button> 或具備互動功能的 <mat-icon>，不要只選取裡面的 <svg> 或 <path>。特徵：aria-label="Send" 或 data-mat-icon-name="send"。',
       'response': '找尋 AI 回覆的文字氣泡。'
     };
-    
+
     const targetDescription = hints[targetType] || targetType;
     console.log(`🚑 [Doctor] 啟動深層診斷: 目標 [${targetType}]...`);
 
-// 策略修改：採用「頭尾夾擊」。保留頭部 5,000 字(結構) + 尾部 55,000 字(輸入框通常在最後)。
+    // 策略 2: 頭尾夾擊法 (Head + Tail Strategy)
+    // 確保能抓到位於頁面最底部的輸入框與按鈕，同時保留頭部樣式資訊
     let safeHtml = htmlSnippet;
     if (htmlSnippet.length > 60000) {
       const head = htmlSnippet.substring(0, 5000);
-      const tail = htmlSnippet.substring(htmlSnippet.length - 55000);
+      // 取最後 55,000 字，因為輸入框通常在 DOM 結構的最下方
+      const tail = htmlSnippet.substring(htmlSnippet.length - 55000); 
       safeHtml = `${head}\n\n\n\n${tail}`;
     }
 
