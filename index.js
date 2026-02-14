@@ -1474,11 +1474,30 @@ async function handleUnifiedCallback(ctx, actionData) {
         if (action === 'DENY') {
             pendingTasks.delete(taskId);
             await ctx.reply('🛡️ 操作駁回');
-        } else if (action === 'APPROVE') {
+   } else if (action === 'APPROVE') {
             const { steps, nextIndex } = task;
             pendingTasks.delete(taskId);
             await ctx.reply("✅ 授權通過，執行中...");
-            const observation = await controller.runSequence(ctx, steps, nextIndex);
+
+            // --- 🛠️ [Fix] 強制執行修正開始 ---
+            const approvedStep = steps[nextIndex];
+            const cmd = approvedStep.cmd || approvedStep.parameter || approvedStep.command || "";
+            let execResult = "";
+            
+            try {
+                // 直接呼叫執行器 (繞過 runSequence 的安全檢查，打破無限輪迴)
+                const output = await controller.executor.run(cmd);
+                execResult = `[Step ${nextIndex + 1} Success] cmd: ${cmd}\nResult:\n${(output || "").trim()}`;
+            } catch (e) {
+                execResult = `[Step ${nextIndex + 1} Failed] cmd: ${cmd}\nError:\n${e.message}`;
+            }
+
+            // 繼續執行剩下還沒跑的步驟
+            const remainingResult = await controller.runSequence(ctx, steps, nextIndex + 1);
+            
+            const observation = [execResult, remainingResult].filter(Boolean).join('\n\n----------------\n\n');
+            // --- 🛠️ [Fix] 強制執行修正結束 ---
+
             if (observation) {
                 const feedbackPrompt = `[System Observation]\nUser approved actions.\nResult:\n${observation}\nReport to user using [GOLEM_REPLY].`;
                 const finalResponse = await brain.sendMessage(feedbackPrompt);
