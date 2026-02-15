@@ -1533,13 +1533,21 @@ async function executeDrop(ctx) {
 
 if (tgBot) {
     tgBot.on('message', (msg) => handleUnifiedMessage(new UniversalContext('telegram', msg, tgBot)));
-    tgBot.on('callback_query', async (query) => { // 🔧 FIX: 改為 async
-    await handleUnifiedCallback(
-      new UniversalContext('telegram', query, tgBot),
-      query.data
-    );
-    await tgBot.answerCallbackQuery(query.id); // 🔧 FIX: 移到 await 之後
-  });
+    
+    // 🛠️ [Fix] 修正後的回調處理：優先應答，避免超時崩潰
+    tgBot.on('callback_query', async (query) => {
+        // 1. 先告訴 Telegram Server "我收到了"，停止前端轉圈圈
+        // .catch() 是關鍵：防止因網路波動或 ID 過期導致整個程式崩潰 (Error: ETELEGRAM: 400)
+        tgBot.answerCallbackQuery(query.id).catch(e => {
+            console.warn(`⚠️ [TG] Callback Answer Warning: ${e.message}`);
+        });
+
+        // 2. 然後再執行耗時的業務邏輯 (AI 分析或指令執行)
+        await handleUnifiedCallback(
+            new UniversalContext('telegram', query, tgBot),
+            query.data
+        );
+    });
 }
 if (dcClient) {
     dcClient.on('messageCreate', (msg) => { if (!msg.author.bot) handleUnifiedMessage(new UniversalContext('discord', msg, dcClient)); });
