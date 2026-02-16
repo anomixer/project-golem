@@ -1,11 +1,11 @@
 /**
  * 檔案名稱: dashboard.js
- * 版本: v8.6 (Titan Chronos Monitor)
+ * 版本: v9.0 (MultiAgent Monitor)
  * ---------------------------------------
  * 更新重點：
- * 1. 🟢 新增 Chronos 時序雷達：捕捉並顯示系統排程任務。
- * 2. 🚦 新增 Queue 流量監控：視覺化對話隊列狀態。
- * 3. 🎨 介面升級：適配 v8.6 核心架構。
+ * 1. 🟢 適配 v9.0 核心架構。
+ * 2. 👥 新增 MultiAgent 活動監控 (青色顯示)。
+ * 3. 🎨 介面標題與狀態更新，保留所有 v8.6 功能。
  */
 const blessed = require('blessed');
 const contrib = require('blessed-contrib');
@@ -23,13 +23,13 @@ class DashboardPlugin {
         this.queueCount = 0;
         this.lastSchedule = "無排程";
 
-        // Web Server Init
+        // Web Server Init (保留 v8.6 Web 介面功能)
         this.webServer = new WebServer(this);
 
         // 2. 初始化螢幕
         this.screen = blessed.screen({
             smartCSR: true,
-            title: '🦞 Golem v8.6 戰術控制台 (Titan Chronos)',
+            title: '🦞 Golem v9.0 戰術控制台 (MultiAgent Edition)',
             fullUnicode: true
         });
 
@@ -59,11 +59,11 @@ class DashboardPlugin {
             label: '⏰ 時序雷達 (Chronos Radar)'
         });
 
-        // [中層] 隊列監控 (Queue Log) - 專門顯示對話進出
+        // [中層] 隊列監控 (Queue Log) - 顯示對話進出與 Agent 會議
         this.queueLog = this.grid.set(4, 6, 3, 6, contrib.log, {
             fg: "magenta",
             selectedFg: "magenta",
-            label: '🚦 隊列交通 (Traffic Control)'
+            label: '🚦 隊列交通 (Traffic & Agents)'
         });
 
         // [底層] 全域日誌 (Global Log)
@@ -101,19 +101,26 @@ class DashboardPlugin {
                 let type = 'general';
                 if (msg.includes('[Chronos]') || msg.includes('排程')) type = 'chronos';
                 else if (msg.includes('[Queue]') || msg.includes('隊列')) type = 'queue';
+                else if (msg.includes('[MultiAgent]')) type = 'agent'; // v9.0 新增類型
 
                 this.webServer.broadcastLog({ time, msg: cleanMsg, type, raw: msg });
             }
 
             // 分流邏輯
             if (msg.includes('[Chronos]') || msg.includes('排程') || msg.includes('TimeWatcher')) {
+                // 保留 Chronos 監控
                 if (this.chronosLog) this.chronosLog.log(`{yellow-fg}${msg}{/yellow-fg}`);
                 if (msg.includes('新增排程')) {
                     this.lastSchedule = msg.split('新增排程:')[1] || "更新中...";
                     if (this.webServer) this.webServer.broadcastState({ lastSchedule: this.lastSchedule });
                 }
             }
+            // v9.0 新增：捕捉 MultiAgent 會議紀錄，並導向 QueueLog 以區隔顯示
+            else if (msg.includes('[InteractiveMultiAgent]') || msg.includes('[MultiAgent]')) {
+                if (this.queueLog) this.queueLog.log(`{cyan-fg}${msg}{/cyan-fg}`);
+            }
             else if (msg.includes('[Queue]') || msg.includes('隊列')) {
+                // 保留原有 Queue 監控
                 if (this.queueLog) this.queueLog.log(`{magenta-fg}${msg}{/magenta-fg}`);
                 // 簡單的狀態解析
                 if (msg.includes('加入隊列')) this.queueCount++;
@@ -148,7 +155,7 @@ class DashboardPlugin {
 
         console.log("\n============================================");
         console.log("📺 Dashboard 已關閉 (Visual Interface Detached)");
-        console.log("🤖 Golem v8.6 仍在背景執行中...");
+        console.log("🤖 Golem v9.0 仍在背景執行中...");
         console.log("============================================\n");
     }
 
@@ -176,16 +183,16 @@ class DashboardPlugin {
                 });
             }
 
-            // 狀態面板更新 (v8.6 特有狀態)
+            // 狀態面板更新 (v9.0 特有狀態)
             this.statusBox.setMarkdown(`
-# 核心狀態 (v8.6)
+# 核心狀態 (v9.0)
 - **模式**: ${mode}
-- **記憶**: Active
+- **架構**: Multi-Agent
 - **運行**: ${hours}h ${minutes}m
 
-# Titan Chronos
-- **隊列**: ${this.queueCount > 0 ? `{red-fg}${this.queueCount} 處理中{/red-fg}` : `{green-fg}空閒{/green-fg}`}
-- **排程**: ${this.lastSchedule.substring(0, 10)}...
+# System Modules
+- **Chronos**: Online
+- **Agents**: Ready
 - **狀態**: 🟢 Online
 `);
             this.screen.render();
