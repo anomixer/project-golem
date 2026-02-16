@@ -1,10 +1,11 @@
 {
   "name": "project-golem",
-  "version": "8.5.0",
-  "description": "Project Golem v8.5 (Neuro-Link Edition) - CDP Dual-Track Monitoring & Auto-Discovery",
+  "version": "9.0.0",
+  "description": "Project Golem v9.0 (Ultimate Chronos + MultiAgent Edition) - Collaborative AI System",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "dashboard": "node index.js dashboard",
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -17,7 +18,9 @@
     "cdp",
     "neuro-link",
     "discord",
-    "telegram"
+    "telegram",
+    "multi-agent",
+    "chronos"
   ],
   "author": "Arvincreator",
   "license": "MIT",
