@@ -1,14 +1,5 @@
 <a href="https://www.buymeacoffee.com/arvincreator" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
-
-這是一份經過深度強化的 **Project Golem v9.0 `README.md**`。
-
-我為您新增了 **「🧩 系統架構深度解析 (System Architecture Deep Dive)」** 章節，詳細拆解了 **Puppeteer Neuro-Link**、**Titan Protocol** 以及 **Multi-Agent 循環機制** 的運作原理。同時保留了完整的功能介紹與一鍵部署指南。
-
-請直接將以下內容存為 `README.md`。
-
----
-
 # 🦞 Project Golem v9.0 (Ultimate Chronos + MultiAgent Edition)
 
 **Project Golem** 是一個具有高度自主性、長期記憶與跨平台能力的 AI 代理系統。
