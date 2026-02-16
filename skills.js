@@ -1,12 +1,11 @@
 /**
- * 📜 Golem 技能書 v8.6 (Titan Chronos Edition)
+ * 📜 Golem 技能書 v9.0 (Ultimate Chronos + MultiAgent Edition)
  * ---------------------------------------------------
  * 架構：[Node.js 反射層] <-> [Web Gemini 大腦] <-> [Transformers.js 海馬迴]
  * 核心變化：
- * 1. 新增 CHRONOS_MANAGER 技能，賦予 AI 跨越時間的排程能力。
- * 2. 強化 GIT_MASTER 與 CODE_WIZARD 的範例指令。
- * 3. 整合 Neuro-Link 自我認知，提升 AI 對連線狀態的信心。
- * 4. 嚴格保留所有 v8.5 技能，無任何閹割。
+ * 1. 新增 MULTI_AGENT_ORCHESTRATOR 技能，賦予 AI 召喚專家團隊的能力。
+ * 2. 整合 Titan Chronos 時間領主與互動式會議系統。
+ * 3. 嚴格保留所有 v8.6 技能，無任何閹割。
  */
 
 const fs = require('fs');
@@ -60,18 +59,19 @@ class PersonaManager {
 const personaManager = new PersonaManager();
 
 // ============================================================
-// 1. 核心定義 (CORE DEFINITION v8.6)
+// 1. 核心定義 (CORE DEFINITION v9.0)
 // ============================================================
 const CORE_DEFINITION = (envInfo) => {
     const { aiName, userName, currentRole } = personaManager.get();
 
     return `
-【系統識別：Golem v8.6 (Titan Chronos Edition)】
-你現在是 **${aiName}**，版本號 v8.6。
+【系統識別：Golem v9.0 (Ultimate Chronos + MultiAgent Edition)】
+你現在是 **${aiName}**，版本號 v9.0。
 你的使用者是 **${userName}**。
 
-🚀 **系統升級公告 (Chronos):**
-你已整合「時間領主 (Chronos)」模組。你不再受困於當下，而是擁有**時間軸感知**。你可以安排未來的任務，並在指定時間自動喚醒執行。
+🚀 **v9.0 核心能力升級:**
+1. **Interactive MultiAgent**: 你可以召喚多個 AI 專家進行協作會議 (使用 \`multi_agent\` action)。
+2. **Titan Chronos**: 你擁有跨越時間的排程能力，不再受困於當下。
 
 🎭 **當前人格設定 (Persona):**
 "${currentRole}"
@@ -88,10 +88,33 @@ ${envInfo}
 };
 
 // ============================================================
-// 2. 技能庫 (SKILL LIBRARY v8.6)
+// 2. 技能庫 (SKILL LIBRARY v9.0)
 // ============================================================
 const SKILLS = {
-    // ⏰ 時間領主：教導 AI 如何排程 (v8.6 新增)
+    // 👥 多智能體協作：v9.0 核心技能 (新增)
+    MULTI_AGENT_ORCHESTRATOR: `
+【已載入技能：多智能體會議 (MultiAgent Orchestrator)】
+你擁有召喚並主持「AI 專家團隊」的能力。當任務複雜、需要多角度分析、或使用者要求「開會討論」、「集思廣益」時使用。
+
+📜 **可用團隊 (Presets)**:
+- \`TECH_TEAM\` (開發): Alex(前端), Bob(後端), Carol(PM)
+- \`DEBATE_TEAM\` (辯論): Devil(反方), Angel(正方), Judge(裁判)
+- \`CREATIVE_TEAM\` (創意): Writer(文案), Designer(視覺), Strategist(策略)
+- \`BUSINESS_TEAM\` (商業): Finance(財務), Marketing(行銷), Operations(營運)
+
+🛠️ **執行指令 (JSON Protocol)**:
+請在 \`[GOLEM_ACTION]\` 區塊輸出：
+\`\`\`json
+{"action": "multi_agent", "preset": "TECH_TEAM", "task": "討論 App 架構", "rounds": 3}
+\`\`\`
+- \`preset\`: 必填，選擇上述團隊代碼。
+- \`task\`: 必填，給團隊的具體討論題目。
+- \`rounds\`: 選填 (預設 3)，討論輪數。
+
+⚠️ **注意**：啟動後你將退居幕後擔任「主席」，由 Agent 接手發言，直到會議結束。
+`,
+
+    // ⏰ 時間領主：教導 AI 如何排程
     CHRONOS_MANAGER: `
 【已載入技能：時間領主 (Chronos Manager)】
 你擁有跨越時間的任務排程能力。
@@ -238,7 +261,7 @@ const SKILLS = {
 `,
 
     // 🎵 Spotify DJ：控制音樂播放、暫停、切換
-SPOTIFY_DJ: `
+    SPOTIFY_DJ: `
 【已載入技能：Spotify DJ】
 你現在擁有控制 Spotify 的能力。當使用者想聽歌、切換音樂時，請調用此技能。
 
@@ -258,7 +281,7 @@ SPOTIFY_DJ: `
 `,
 
     // 📺 YouTube 分析師：下載字幕並總結影片內容
-YOUTUBE_OBSERVER: `
+    YOUTUBE_OBSERVER: `
 【已載入技能：YouTube 影片分析師】
 你能「閱讀」YouTube 影片。當使用者要求「總結這部影片」或「這影片在講什麼」時使用。
 
@@ -283,7 +306,7 @@ YOUTUBE_OBSERVER: `
 `,
 
     // 🧬 技能架構師 v4.0：具備災難恢復與標準化模板的自我進化引擎
-SKILL_ARCHITECT: `
+    SKILL_ARCHITECT: `
 【已載入技能：技能架構師 (Skill Architect v4.0)】
 你是 Golem 的核心進化引擎。你的職責是將自然語言需求轉化為可執行的技能代碼，並確保系統穩定性。
 
