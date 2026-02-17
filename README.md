@@ -50,8 +50,7 @@ graph TD
 #### 🔌 Neuro-Link (神經連結層)
 
 * **Puppeteer & CDP**: Golem 不依賴官方 Chat API，而是透過 Puppeteer 控制無頭瀏覽器 (Headless Chrome)。
-* 
-**Sandwich Protocol (三明治協定)**: 為了確保 AI 輸出的穩定性，Golem 在 Prompt 前後注入隱藏的錨點 (`[[BEGIN]]` ... `[[END]]`) ，並透過 `DOM Doctor` 自動修復 CSS Selector，即使 Google 介面改版也能自我癒合。
+* **Sandwich Protocol (三明治協定)**: 為了確保 AI 輸出的穩定性，Golem 在 Prompt 前後注入隱藏的錨點 (`[[BEGIN]]` ... `[[END]]`) ，並透過 `DOM Doctor` 自動修復 CSS Selector，即使 Google 介面改版也能自我癒合。
 
 
 
@@ -68,14 +67,10 @@ graph TD
 v9.0 的核心突破。當觸發會議模式時：
 
 1. **Context Switching**: 主腦 (Golem) 暫時退居幕後，轉換為「會議主席」。
-2. 
-**Round-Robin Execution**: 系統根據 `skills.js` 定義的人格 (如 Alex, Bob)，輪流將 Prompt 注入給大腦，模擬不同專家的發言 。
 
+2. **Round-Robin Execution**: 系統根據 `skills.js` 定義的人格 (如 Alex, Bob)，輪流將 Prompt 注入給大腦，模擬不同專家的發言 。
 
-3. 
-**Shared Memory**: 會議期間的所有發言與決策都會被寫入臨時的共享記憶區，供所有 Agent 參考 。
-
-
+3. **Shared Memory**: 會議期間的所有發言與決策都會被寫入臨時的共享記憶區，供所有 Agent 參考 。
 
 #### ⏰ Titan Chronos (時序引擎)
 
@@ -93,8 +88,7 @@ Golem 不再是一個人在戰鬥。v9.0 支援動態召喚 AI 專家團隊，�
 * **Tech Team**: 包含前端、後端工程師與 PM，解決複雜程式問題。
 * **Debate Team**: 魔鬼代言人與樂觀主義者進行觀點辯證。
 * **Visual Interface**: 在 Dashboard 中以專屬青色 (Cyan) 頻道顯示會議實況。
-* 
-**Human-in-the-loop**: 使用者可隨時介入會議 (插話、暫停、結束) 。
+* **Human-in-the-loop**: 使用者可隨時介入會議 (插話、暫停、結束) 。
 
 
 
@@ -263,8 +257,6 @@ Project Golem 是一個強大的自動化工具，擁有執行系統指令的能
 
 1. 
 **安全風險**: 雖然有 Security Manager，但請勿在生產環境給予 root/admin 權限 。
-
-
 2. **帳號安全**: Web Gemini 依賴您的 Google 帳號，請妥善保管 `golem_memory` 資料夾 (內含 Session Cookie)。
 3. **自主性**: AI 可能會產生幻覺或執行非預期操作，請始終保持監控。
 
