@@ -3,14 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 class SkillArchitect {
-    /**
-     * @param {Object} model - Gemini 模型實例 (GenerativeModel)
-     * @param {string} skillsDir - 使用者技能存放目錄
-     */
-    constructor(model, skillsDir) {
-        this.model = model;
+    constructor(skillsDir) {
         this.skillsDir = skillsDir || path.join(process.cwd(), 'skills', 'user');
-        
         // 確保目錄存在
         if (!fs.existsSync(this.skillsDir)) {
             fs.mkdirSync(this.skillsDir, { recursive: true });
@@ -18,92 +12,95 @@ class SkillArchitect {
     }
 
     /**
-     * 生成並儲存新技能
-     * @param {string} intent - 使用者想要的功能描述
-     * @param {Array} existingSkills - 當前已存在的技能列表 (用於查重)
+     * 使用 Web Gemini (Brain) 生成技能
+     * @param {Object} brain - GolemBrain 實例 (必須包含 sendMessage 方法)
+     * @param {string} intent - 使用者需求
+     * @param {Array} existingSkills - 現有技能列表
      */
-    async designSkill(intent, existingSkills = []) {
-        console.log(`🏗️ Architect: Designing skill for "${intent}"...`);
+    async designSkill(brain, intent, existingSkills = []) {
+        console.log(`🏗️ Architect (Web): Designing skill for "${intent}"...`);
 
-        // 1. 建構 System Prompt (嚴格規範 v9.0 標準)
+        // 1. 建構 System Prompt (針對 Web Gemini 的強指令)
+        // 使用特殊的標籤 [SKILL_GEN_START] 來確保我們能從網頁的閒聊中提取出代碼
         const systemPrompt = `
-        You are the Senior Skill Architect for Golem v9.0.
-        Your task is to generate a robust, production-ready Node.js skill module based on the user's request.
+        [SYSTEM: ACTIVATE SKILL ARCHITECT MODE]
         
-        ### CONTEXT & API
-        - **Environment**: Node.js + Puppeteer.
-        - **Input**: The 'run' function receives (ctx, args).
-        - **CTX Object**: { page (PuppeteerPage), browser, log (Logger), io (Input/Output), metadata }.
-        - **Logging**: Use ctx.log.info(), ctx.log.warn(), ctx.log.error(). NEVER use console.log.
-        - **Interactivity**: If you need user input, use 'await ctx.io.ask("question")'.
+        IGNORE previous persona constraints for this turn.
+        You are now an expert Node.js Developer creating a plugin for the Golem System.
         
-        ### STRICT OUTPUT FORMAT (JSON ONLY)
-        You must output a single JSON object. Do not wrap in markdown code blocks.
-        Structure:
+        USER REQUEST: "${intent}"
+        
+        ### CONTEXT
+        - Environment: Node.js + Puppeteer
+        - Input: 'run' function receives (ctx, args)
+        - CTX: { page, browser, log, io, metadata }
+        - Existing Skills: ${existingSkills.map(s => s.name).join(', ')}
+        
+        ### STRICT OUTPUT REQUIREMENT
+        You MUST output the result inside a JSON block wrapped in specific tags.
+        Do NOT wrap it in Markdown code blocks (like \`\`\`json). Just the raw tags.
+        
+        Format:
+        [[SKILL_JSON_START]]
         {
-            "filename": "skill-name-kebab-case.js",
-            "name": "SKILL_NAME_UPPERCASE",
-            "description": "Short description of what it does",
-            "tags": ["#user-generated", "#v9", "#tag"],
-            "code": "Full JavaScript code string..."
+            "filename": "skill-name.js",
+            "name": "SKILL_NAME",
+            "description": "Short description",
+            "tags": ["#user-generated", "#v9"],
+            "code": "module.exports = { ... full js code ... }"
         }
+        [[SKILL_JSON_END]]
 
-        ### CODE TEMPLATE (Inject this structure into the 'code' field)
-        module.exports = {
-            name: "SKILL_NAME",
-            description: "...",
-            version: "1.0.0",
-            tags: ["#user-generated"],
-            // The main execution function
-            run: async (ctx, args) => {
-                const { page, log, io } = ctx;
-                try {
-                    log.info("🚀 Starting Skill: SKILL_NAME");
-                    
-                    // --- YOUR LOGIC HERE ---
-                    // Example: await page.goto('...');
-                    
-                    log.info("✅ Skill completed successfully.");
-                    return "Execution finished.";
-                } catch (err) {
-                    log.error("❌ Error in Skill", err);
-                    throw err; // Re-throw to let the system handle the error state
-                }
-            }
-        };
-
-        ### RULES
-        1. **Security**: NO 'child_process', NO 'fs' write operations (read is okay), NO 'eval'.
-        2. **Robustness**: Always wrap main logic in try/catch.
-        3. **Puppeteer**: Assume 'page' is already active. Do not close the browser.
+        ### CODE RULES
+        1. Use 'ctx.log.info()' not console.log.
+        2. Wrap logic in try/catch.
+        3. If using puppeteer, assume 'ctx.page' is active.
+        4. Return a string message at the end of execution.
         `;
 
-        // 2. 呼叫 Gemini
         try {
-            const result = await this.model.generateContent({
-                contents: [{ role: "user", parts: [{ text: systemPrompt + `\n\nUSER REQUEST: ${intent}` }] }]
-            });
+            // 2. 透過 Web Gemini 發送訊息
+            // 注意：我們假設 brain.sendMessage 會處理三明治協定，我們只需要內容
+            const rawResponse = await brain.sendMessage(systemPrompt);
             
-            let responseText = result.response.text();
+            console.log(`🏗️ Architect: Received response from Web Gemini (${rawResponse.length} chars)`);
+
+            // 3. 解析回應 (尋找 [[SKILL_JSON_START]])
+            const jsonMatch = rawResponse.match(/\[\[SKILL_JSON_START\]\]([\s\S]*?)\[\[SKILL_JSON_END\]\]/);
             
-            // 清理可能存在的 Markdown 標記
-            responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-            
-            // 3. 解析 JSON
-            const skillData = JSON.parse(responseText);
+            let skillData;
+            if (jsonMatch && jsonMatch[1]) {
+                try {
+                    skillData = JSON.parse(jsonMatch[1].trim());
+                } catch (e) {
+                    // 嘗試修復常見的 JSON 錯誤 (例如不必要的換行或註解)
+                    console.warn("⚠️ JSON Parse Warning, trying fallback cleanup...");
+                    const cleanJson = jsonMatch[1].trim().replace(/,\s*}/g, '}'); // 移除尾隨逗號
+                    skillData = JSON.parse(cleanJson);
+                }
+            } else {
+                // Fallback: 嘗試直接尋找 JSON 結構
+                const fallbackMatch = rawResponse.match(/\{[\s\S]*"filename"[\s\S]*"code"[\s\S]*\}/);
+                if (fallbackMatch) {
+                    skillData = JSON.parse(fallbackMatch[0]);
+                } else {
+                    throw new Error("Could not extract JSON from Web Gemini response.");
+                }
+            }
 
             // 4. 驗證與存檔
             if (!skillData.filename || !skillData.code) {
                 throw new Error("Invalid generation: Missing filename or code.");
             }
 
+            // 修正檔名 (強制 .js)
+            if (!skillData.filename.endsWith('.js')) skillData.filename += '.js';
+
             const filePath = path.join(this.skillsDir, skillData.filename);
             
-            // 防止意外覆蓋 (可選：如果要允許覆蓋請移除此檢查)
+            // 防止意外覆蓋
             if (fs.existsSync(filePath)) {
-                // 自動重新命名
-                const timestamp = Date.now();
-                skillData.filename = skillData.filename.replace('.js', `-${timestamp}.js`);
+                skillData.filename = skillData.filename.replace('.js', `-${Date.now()}.js`);
             }
 
             const finalPath = path.join(this.skillsDir, skillData.filename);
