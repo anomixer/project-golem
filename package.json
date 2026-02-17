@@ -1,7 +1,7 @@
 {
   "name": "project-golem",
   "version": "9.0.0",
-  "description": "Advanced AI Agent System with Web Dashboard integration (Gemini + Puppeteer)",
+  "description": "Advanced AI Agent System with Web Dashboard (Cross-Platform)",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -16,9 +16,13 @@
     "dashboard:install": "cd web-dashboard && npm install",
     "dashboard:build": "cd web-dashboard && npm run build",
     
-    "// --- Windows Integration (整合指令) ---": "",
-    "setup": "setup.bat",
-    "launcher": "setup.bat",
+    "// --- Windows Integration (Windows 專用) ---": "",
+    "win:setup": "setup.bat",
+    "win:start": "setup.bat",
+    
+    "// --- Linux/macOS Integration (Unix 專用) ---": "",
+    "unix:setup": "chmod +x setup.sh && ./setup.sh",
+    "unix:start": "./setup.sh",
     
     "// --- Automation Hooks (自動化鉤子) ---": "",
     "postinstall": "echo [INFO] Auto-installing Dashboard dependencies... && npm run dashboard:install && echo [OK] Dashboard ready."
