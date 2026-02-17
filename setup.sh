@@ -93,9 +93,43 @@ fi
 echo ""
 
 # ------------------------------------------------------------
-# 4. 選擇記憶引擎
+# 4. 安裝 Web Dashboard (Next.js)
 # ------------------------------------------------------------
-echo -e "[5/6] 請選擇 Golem 的記憶引擎模式："
+echo -e "[5/7] 正在檢查 Web Dashboard..."
+if [ -d "web-dashboard" ]; then
+    echo -e "${CYAN}偵測到 web-dashboard 目錄。是否要安裝並建置 Dashboard 前端？${NC}"
+    echo -e "${YELLOW}(這可能需要幾分鐘，視您的網路速度而定)${NC}"
+    read -p "👉 是否安裝？[Y/n] (預設 Y): " INSTALL_DASH
+    INSTALL_DASH=${INSTALL_DASH:-Y}
+
+    if [[ "$INSTALL_DASH" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}📦 正在安裝 Dashboard 依賴...${NC}"
+        cd web-dashboard
+        npm install
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}❌ Dashboard 依賴安裝失敗。${NC}"
+        else
+            echo -e "${YELLOW}🔨 正在建置 Dashboard (Next.js Build)...${NC}"
+            npm run build
+            if [ $? -ne 0 ]; then
+                echo -e "${RED}❌ Dashboard 建置失敗。${NC}"
+            else
+                echo -e "${GREEN}✅ Dashboard 建置完成 (./web-dashboard/out)。${NC}"
+            fi
+        fi
+        cd ..
+    else
+        echo -e "${YELLOW}⏩ 跳過 Dashboard 安裝。${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️ 找不到 web-dashboard 目錄，跳過此步驟。${NC}"
+fi
+echo ""
+
+# ------------------------------------------------------------
+# 5. 選擇記憶引擎
+# ------------------------------------------------------------
+echo -e "[6/7] 請選擇 Golem 的記憶引擎模式："
 echo "=========================================================="
 echo " [1] 🌐 瀏覽器模式 (預設) - 適合新手，v9.0 Chronos 原生支援。"
 echo " [2] 🚀 系統模式 (qmd)   - 高效能，需安裝 Bun/qmd。"
@@ -142,9 +176,9 @@ fi
 echo ""
 
 # ------------------------------------------------------------
-# 5. 自動修補檢測 (Auto-Patch)
+# 6. 自動修補檢測 (Auto-Patch)
 # ------------------------------------------------------------
-echo -e "[6/6] 正在檢查自動修補腳本 (patch.js)..."
+echo -e "[7/7] 正在檢查自動修補腳本 (patch.js)..."
 
 if [ -f "patch.js" ]; then
     echo -e "${YELLOW}🔧 偵測到 patch.js，正在執行修補程序...${NC}"
