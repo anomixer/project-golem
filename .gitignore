@@ -1,70 +1,77 @@
 # ==========================================
-# 1. 安全性防護 (Security) - 最重要！
+# 1. 安全性 (Security) - 絕對不能上傳
 # ==========================================
 .env
-.env.local
-.env.*.local
+.env.test
 .env.production
-.env.development
-*.pem
-*.key
+# 防止 Google Session 或 Puppeteer Cookies 洩漏
+google-session.json
+*.cookie
+*.json.last
 
 # ==========================================
-# 2. 依賴套件 (Dependencies)
+# 2. Node.js 核心
 # ==========================================
-# 根目錄依賴
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
-yarn.lock
-
-# Dashboard 子目錄依賴 (關鍵！)
-web-dashboard/node_modules/
-web-dashboard/.pnp
-web-dashboard/.pnp.js
+# ^ 建議保留 package-lock.json 以鎖定依賴版本，若不習慣可註解掉
 
 # ==========================================
-# 3. Next.js / Dashboard 編譯產物
+# 3. Golem V9.0 記憶體與資料庫 (Memory & DB)
 # ==========================================
-# Next.js 編譯資料夾 (體積巨大，絕對不要上傳)
-web-dashboard/.next/
-web-dashboard/out/
-web-dashboard/build/
-web-dashboard/dist/
+# Titan Chronos 的排程與隊列數據
+queue/
+*.db
+*.sqlite
+*.sqlite-journal
 
-# Next.js 緩存
-web-dashboard/.eslintcache
-web-dashboard/*.tsbuildinfo
-web-dashboard/next-env.d.ts
+# 向量記憶體與知識庫 (Local RAG)
+golem_memory/
+memory/knowledge/
+# 如果您希望保留預設記憶模板，可使用 !golem_memory/template/
 
-# ==========================================
-# 4. 系統與編輯器雜檔 (System & IDE)
-# ==========================================
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# IDE 設定
-.idea/
-.vscode/
-*.swp
-*.swo
+# Transformers.js 模型緩存 (避免上傳幾百 MB 的模型檔)
+.cache/
+models/
+ONNX/
 
 # ==========================================
-# 5. 專案日誌與暫存 (Logs & Temp)
+# 4. Puppeteer 瀏覽器暫存 (Browser Data)
+# ==========================================
+# Puppeteer 下載的 Chromium (如果裝在專案內)
+.local-chromium/
+.puppeteer/
+
+# 使用者資料夾 (含登入 Session，檔案巨大且敏感)
+user_data/
+profile/
+puppeteer_data/
+
+# ==========================================
+# 5. 執行日誌與除錯 (Logs & Debug)
 # ==========================================
 logs/
 *.log
-npm-debug.log
-temp_*.txt
-test-results/
-coverage/
+error.txt
+combined.log
+
+# 截圖與錄影 (Agent 執行失敗時的截圖)
+screenshots/
+videos/
+*.png
+*.jpg
+*.mp4
 
 # ==========================================
-# 6. 腳本產生的暫存檔
+# 6. 系統雜檔 (System Junk)
 # ==========================================
-# 避免 setup.bat 執行過程中產生的暫存檔被提交
-temp_ver.txt
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+temp/
+tmp/
