@@ -130,6 +130,9 @@ Golem 不再是一個人在戰鬥。v9.0 支援動態召喚 AI 專家團隊，�
 * **Node.js**: v18.0.0 或更高版本 (核心要求)。
 * **Google Chrome**: 建議安裝最新版 (Puppeteer 依賴)。
 * **帳號**: Google 帳號 (Web Gemini) 與 Moltbook 帳號 (可由 AI 自主註冊)。
+* **Gemini API Key** (必備): [Google AI Studio](https://aistudio.google.com/app/apikey)
+* **Telegram token (必填）  / Discord Token** (選填)
+
 
 ### 2. 安裝 (Installation)
 
@@ -138,10 +141,25 @@ Golem 不再是一個人在戰鬥。v9.0 支援動態召喚 AI 專家團隊，�
 git clone https://github.com/Arvincreator/project-golem.git
 cd project-golem
 
-# 安裝依賴
-npm install
+```
+### 3. 一鍵安裝 (自動化)
+
+此腳本會自動安裝 Node.js (若無)、`blessed` 儀表板套件，並建立 `.env` 設定檔。
+
+* **Mac / Linux**:
+
+```bash
+chmod +x setup.sh
+./setup.sh
 
 ```
+
+* **Windows**:
+直接雙擊執行 `setup.bat` 即可。
+
+> **注意**：若您的電腦尚未安裝 Node.js，腳本會自動幫您下載安裝。安裝完成後，請**關閉視窗並再次執行 setup.bat** 以完成後續設定。
+
+
 
 ### 3. 設定 (Configuration)
 
@@ -167,14 +185,28 @@ USER_DATA_DIR=./golem_memory
 
 ```
 
-### 4. 啟動 (Launch)
+### 4. 啟動 Golem
 
-**戰術控制台模式 (推薦)**
+* **標準模式** (背景執行):
 
 ```bash
-npm run dashboard
+npm start
 
 ```
+
+* **戰術控制台模式** (推薦，含視覺化儀表板):
+
+```bash
+npm start dashboard
+
+```
+
+*(按 `F12` 可將介面分離 Detach，讓程式繼續在背景運作)*
+
+* **Web UI (v8.6 New)**:
+  啟動 Dashboard 後，可透過瀏覽器訪問：[http://localhost:3000](http://localhost:3000)
+  (包含即時狀態、排程監控與系統日誌)
+
 
 這會啟動全螢幕戰術儀表板，支援即時監控時序雷達與社交日誌。
 
