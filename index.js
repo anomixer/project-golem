@@ -1,19 +1,31 @@
 /**
- * 🦞 Project Golem v9.0 (Ultimate Chronos + MultiAgent + WebSkillEngine Edition)
+ * 🦞 Project Golem v9.1 (Integrity Core Edition)
  * -------------------------------------------------------------------------
  * 架構：[Universal Context] -> [Conversation Queue] -> [NeuroShunter] <==> [Web Gemini]
- * * 🎯 v9.0 核心升級：
- * 1. 結合 v8.7 的高穩定性 (Flood Guard, KeyChain v2)
- * 2. 整合 v8.8 的互動式多 Agent 會議系統 (InteractiveMultiAgent)
- * 3. 升級 Titan Protocol 支援多重動作指令
- * 4. ✨ 新增 Web-Based Skill Engine (Architect 使用 Web Gemini 生成)
+ * * 🎯 v9.1 核心升級：
+ * 1. ⚡ 非同步部署 (Async Deployment): 自我升級不再卡住 Event Loop。
+ * 2. 🛡️ 全域錯誤防護 (Global Error Guard): 防止未捕獲的 Promise 導致崩潰。
+ * 3. 🧠 深度整合 Introspection: 啟動時建立自我結構快取。
  * * [保留功能]
+ * - v9.0 所有功能 (InteractiveMultiAgent, WebSkillEngine)
  * - KeyChain v2 智慧冷卻機制
- * - SecurityManager v2 Taint 追蹤
  * - Flood Guard 啟動時間過濾
  * - DOM Doctor 自動修復
  */
 require('dotenv').config();
+
+// ==========================================
+// 🛡️ [v9.1 NEW] 全域錯誤防護 (Global Safety Nets)
+// ==========================================
+process.on('uncaughtException', (err) => {
+    console.error('🔥 [CRITICAL] Uncaught Exception:', err);
+    // 保持進程存活，避免直接重啟導致 Context 丟失
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ [WARNING] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // ==========================================
 // 📟 儀表板外掛 (Dashboard Switch)
 // ==========================================
@@ -29,7 +41,7 @@ if (process.argv.includes('dashboard')) {
 }
 
 // ==========================================
-const fs = require('fs');
+const fs = require('fs').promises; // ✨ [v9.1 Update] 改為 Promise 版本以支援非同步部署
 const path = require('path');
 const { spawn } = require('child_process');
 const TelegramBot = require('node-telegram-bot-api');
@@ -47,6 +59,9 @@ const UniversalContext = require('./src/core/UniversalContext');
 const OpticNerve = require('./src/services/OpticNerve');
 const SystemUpgrader = require('./src/managers/SystemUpgrader');
 const InteractiveMultiAgent = require('./src/core/InteractiveMultiAgent');
+
+// ✨ [v9.1 NEW] 整合內省模組
+const introspection = require('./src/services/Introspection');
 
 // Initialize Integrations
 const tgBot = CONFIG.TG_TOKEN ? new TelegramBot(CONFIG.TG_TOKEN, { polling: true }) : null;
@@ -81,8 +96,13 @@ const pendingTasks = controller.pendingTasks; // Shared reference
 (async () => {
     if (process.env.GOLEM_TEST_MODE === 'true') { console.log('🚧 GOLEM_TEST_MODE active.'); return; }
     await brain.init();
+    
+    // ✨ [v9.1 NEW] 啟動時預掃描專案結構，建立快取
+    console.log('🧠 [Introspection] Pre-scanning project structure...');
+    await introspection.getStructure();
+
     autonomy.start();
-    console.log('✅ Golem v9.0 (Ultimate Chronos + MultiAgent Edition) is Online.');
+    console.log('✅ Golem v9.1 (Integrity Core Edition) is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
 })();
 
@@ -94,18 +114,18 @@ async function handleUnifiedMessage(ctx) {
     // ⏱️ [v8.7 保留] Flood Guard - 忽略離線期間訊息
     const msgTime = ctx.messageTime;
     if (msgTime && msgTime < BOOT_TIME) {
-        console.log(`⏸️ [Flood Guard] 忽略離線訊息 (${new Date(msgTime).toLocaleString('zh-TW')})`);
+        // console.log(`⏸️ [Flood Guard] 忽略離線訊息 (${new Date(msgTime).toLocaleString('zh-TW')})`);
         return;
     }
 
-    // ✨ [v9.0] 優先檢查：是否在 MultiAgent 等待用戶輸入
+    // ✨ [v9.0 保留] 優先檢查：是否在 MultiAgent 等待用戶輸入
     if (global.multiAgentListeners && global.multiAgentListeners.has(ctx.chatId)) {
         const callback = global.multiAgentListeners.get(ctx.chatId);
         callback(ctx.text); // 將輸入傳給 MultiAgent
         return; // 不進入正常流程
     }
 
-    // ✨ [v9.0] 檢查：是否要恢復會議
+    // ✨ [v9.0 保留] 檢查：是否要恢復會議
     if (ctx.text && ['恢復會議', 'resume', '繼續會議'].includes(ctx.text.toLowerCase())) {
         if (InteractiveMultiAgent.canResume(ctx.chatId)) {
             await InteractiveMultiAgent.resumeConversation(ctx, brain);
@@ -116,10 +136,15 @@ async function handleUnifiedMessage(ctx) {
     if (!ctx.text && !ctx.getAttachment) return;
     if (!ctx.isAdmin) return;
     if (await NodeRouter.handle(ctx, brain)) return;
-    if (global.pendingPatch && ['ok', 'deploy', 'y', '部署'].includes(ctx.text.toLowerCase())) return executeDeploy(ctx);
-    if (global.pendingPatch && ['no', 'drop', 'n', '丟棄'].includes(ctx.text.toLowerCase())) return executeDrop(ctx);
+    
+    // 部署指令攔截
+    const lowerText = ctx.text ? ctx.text.toLowerCase() : '';
+    if (global.pendingPatch) {
+        if (['ok', 'deploy', 'y', '部署'].includes(lowerText)) return executeDeploy(ctx);
+        if (['no', 'drop', 'n', '丟棄'].includes(lowerText)) return executeDrop(ctx);
+    }
 
-    if (ctx.text.startsWith('/patch') || ctx.text.includes('優化代碼')) {
+    if (lowerText.startsWith('/patch') || lowerText.includes('優化代碼')) {
         await autonomy.performSelfReflection(ctx);
         return;
     }
@@ -174,6 +199,7 @@ async function handleUnifiedCallback(ctx, actionData) {
             const cmd = approvedStep.cmd || approvedStep.parameter || approvedStep.command || "";
             let execResult = "";
             try {
+                // controller.executor 現在是新的 Executor v2，支援 run()
                 const output = await controller.executor.run(cmd);
                 execResult = `[Step ${nextIndex + 1} Success] cmd: ${cmd}\nResult:\n${(output || "").trim()}`;
             } catch (e) {
@@ -190,17 +216,29 @@ async function handleUnifiedCallback(ctx, actionData) {
     }
 }
 
+// ============================================================
+// 🚀 [v9.1 Update] Async Deployment System
+// ============================================================
 async function executeDeploy(ctx) {
     if (!global.pendingPatch) return;
     try {
         const { path: patchPath, target: targetPath, name: targetName } = global.pendingPatch;
-        fs.copyFileSync(targetPath, `${targetName}.bak-${Date.now()}`);
-        fs.writeFileSync(targetPath, fs.readFileSync(patchPath));
-        fs.unlinkSync(patchPath);
+        
+        // ✨ [v9.1] 非同步複製備份
+        try {
+            await fs.copyFile(targetPath, `${targetName}.bak-${Date.now()}`);
+        } catch (e) {
+            // 忽略備份錯誤 (可能是新檔案)
+        }
+
+        // ✨ [v9.1] 非同步讀寫操作，避免卡死 Bot
+        const patchContent = await fs.readFile(patchPath);
+        await fs.writeFile(targetPath, patchContent);
+        await fs.unlink(patchPath);
+        
         global.pendingPatch = null;
         if (brain && brain.memoryDriver && brain.memoryDriver.recordSuccess) {
-            // Try/Catch in case memory driver doesn't support it directly or isn't initialized
-            try { brain.memoryDriver.recordSuccess(); } catch (e) { }
+            try { await brain.memoryDriver.recordSuccess(); } catch (e) { }
         }
         await ctx.reply(`🚀 ${targetName} 升級成功！正在重啟...`);
         const subprocess = spawn(process.argv[0], process.argv.slice(1), { detached: true, stdio: 'ignore' });
@@ -211,10 +249,13 @@ async function executeDeploy(ctx) {
 
 async function executeDrop(ctx) {
     if (!global.pendingPatch) return;
-    try { fs.unlinkSync(global.pendingPatch.path); } catch (e) { }
+    try { 
+        // ✨ [v9.1] 非同步刪除
+        await fs.unlink(global.pendingPatch.path); 
+    } catch (e) { }
     global.pendingPatch = null;
     if (brain && brain.memoryDriver && brain.memoryDriver.recordRejection) {
-        try { brain.memoryDriver.recordRejection(); } catch (e) { }
+        try { await brain.memoryDriver.recordRejection(); } catch (e) { }
     }
     await ctx.reply("🗑️ 提案已丟棄");
 }
@@ -223,15 +264,11 @@ async function executeDrop(ctx) {
 if (tgBot) {
     tgBot.on('message', (msg) => handleUnifiedMessage(new UniversalContext('telegram', msg, tgBot)));
 
-    // 🛠️ [Fix] 修正後的回調處理：優先應答，避免超時崩潰
     tgBot.on('callback_query', async (query) => {
-        // 1. 先告訴 Telegram Server "我收到了"，停止前端轉圈圈
-        // .catch() 是關鍵：防止因網路波動或 ID 過期導致整個程式崩潰 (Error: ETELEGRAM: 400)
         tgBot.answerCallbackQuery(query.id).catch(e => {
             console.warn(`⚠️ [TG] Callback Answer Warning: ${e.message}`);
         });
 
-        // 2. 然後再執行耗時的業務邏輯 (AI 分析或指令執行)
         await handleUnifiedCallback(
             new UniversalContext('telegram', query, tgBot),
             query.data
@@ -243,4 +280,4 @@ if (dcClient) {
     dcClient.on('interactionCreate', (interaction) => { if (interaction.isButton()) handleUnifiedCallback(new UniversalContext('discord', interaction, dcClient), interaction.customId); });
 }
 
-module.exports = { brain, controller, autonomy, convoManager }; // Export for testing/dashboard
+module.exports = { brain, controller, autonomy, convoManager };
