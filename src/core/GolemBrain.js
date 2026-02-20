@@ -312,12 +312,16 @@ ${text}`;
             };
 
             try {
-                // 如果 response selector 是空的，跳過嘗試基準線，直接等報錯進入 DOM Doctor
+                // ✨ [修復 1: 智慧向上擴展 - 基準線計算]
                 let baseline = "";
                 if (sel.response && sel.response.trim() !== "") {
                      baseline = await this.page.evaluate((s) => {
                         const bubbles = document.querySelectorAll(s);
-                        return bubbles.length > 0 ? bubbles[bubbles.length - 1].innerText : "";
+                        if (bubbles.length === 0) return "";
+                        let target = bubbles[bubbles.length - 1];
+                        // 強制往上層抓取整個訊息框，無視結尾是否為 p 標籤
+                        let container = target.closest('model-response') || target.closest('.markdown') || target.closest('.model-response-text') || target.parentElement || target;
+                        return container.innerText || "";
                     }, sel.response).catch(() => "");
                 } else {
                      console.log("⚠️ Response Selector 為空，等待觸發修復。");
@@ -393,8 +397,15 @@ ${text}`;
                             const bubbles = document.querySelectorAll(selector);
                             if (bubbles.length === 0) { setTimeout(check, 500); return; }
 
-                            const currentLastBubble = bubbles[bubbles.length - 1];
-                            const rawText = currentLastBubble.innerText || "";
+                            // ✨ [修復 2: 智慧向上擴展 - 內容擷取]
+                            let currentLastBubble = bubbles[bubbles.length - 1];
+                            let container = currentLastBubble.closest('model-response') || 
+                                            currentLastBubble.closest('.markdown') || 
+                                            currentLastBubble.closest('.model-response-text') || 
+                                            currentLastBubble.parentElement || 
+                                            currentLastBubble;
+
+                            const rawText = container.innerText || "";
                             const startIndex = rawText.indexOf(startTag);
 
                             if (startIndex !== -1) {
@@ -424,7 +435,7 @@ ${text}`;
                                 if (stableCount > 5) { resolve({ status: 'FALLBACK_DIFF', text: rawText }); return; }
                             }
 
-                            if (Date.now() - startTime > 120000) { resolve({ status: 'TIMEOUT', text: '' }); return; } // Web Skill 生成可能需要較長時間
+                            if (Date.now() - startTime > 120000) { resolve({ status: 'TIMEOUT', text: '' }); return; } 
                             setTimeout(check, 500);
                         };
                         check();
