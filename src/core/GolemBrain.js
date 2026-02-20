@@ -296,21 +296,38 @@ ${text}`;
         const tryInteract = async (sel, retryCount = 0) => {
             if (retryCount > 3) throw new Error("🔥 DOM Doctor 修復失敗，請檢查網路或 HTML 結構大幅變更。");
 
-            // ✨ 智慧型脫殼濾水器函數 (Anti-Taint Filter)
+            // ✨ 放寬脫殼濾水器，只過濾會導致語法錯誤的部分
             const cleanSelector = (rawSelector) => {
                 if (!rawSelector) return "";
-                return rawSelector
+                let cleaned = rawSelector
                     .replace(/```[a-zA-Z]*\s*/gi, '') // 拔除開頭的 ```css 或 ```html
                     .replace(/`/g, '')                 // 拔除所有反引號
-                    .replace(/^(css|html|json)\s*/i, '') // 拔除單獨出現在開頭的語言標籤
                     .trim();
+                
+                // 如果一開始是 "css "，也只拔除這三個字，不影響後面的內容
+                if (cleaned.toLowerCase().startsWith('css ')) {
+                   cleaned = cleaned.substring(4).trim();
+                }
+                return cleaned;
             };
 
             try {
-                const baseline = await this.page.evaluate((s) => {
-                    const bubbles = document.querySelectorAll(s);
-                    return bubbles.length > 0 ? bubbles[bubbles.length - 1].innerText : "";
-                }, sel.response).catch(() => "");
+                // 如果 response selector 是空的，跳過嘗試基準線，直接等報錯進入 DOM Doctor
+                let baseline = "";
+                if (sel.response && sel.response.trim() !== "") {
+                     baseline = await this.page.evaluate((s) => {
+                        const bubbles = document.querySelectorAll(s);
+                        return bubbles.length > 0 ? bubbles[bubbles.length - 1].innerText : "";
+                    }, sel.response).catch(() => "");
+                } else {
+                     console.log("⚠️ Response Selector 為空，等待觸發修復。");
+                     throw new Error(`空的 Response Selector`);
+                }
+
+                // 安全檢查：如果 input 是空的，直接進修復
+                if (!sel.input || sel.input.trim() === "") {
+                     throw new Error(`空的 Input Selector`);
+                }
 
                 let inputEl = await this.page.$(sel.input);
                 if (!inputEl) {
@@ -334,25 +351,31 @@ ${text}`;
 
                 await new Promise(r => setTimeout(r, 800));
 
-                let sendEl = await this.page.$(sel.send);
-                if (!sendEl) {
-                    console.log("🚑 找不到發送按鈕，呼叫 DOM Doctor...");
-                    const html = await this.page.content();
-                    let newSel = await this.doctor.diagnose(html, 'send');
-                    if (newSel) {
-                        this.selectors.send = cleanSelector(newSel);
-                        console.log(`🧼 [Doctor] 清洗後的 Send Selector: ${this.selectors.send}`);
-                        this.doctor.saveSelectors(this.selectors);
-                        return tryInteract(this.selectors, retryCount + 1);
-                    }
-                    console.log("⚠️ 無法修復按鈕，嘗試使用 Enter 鍵發送...");
+                // ✨ [防空防當機制] 如果送出按鈕的 Selector 變成空字串了，不要再用 $ 找了，直接改按 Enter！
+                if (!sel.send || sel.send.trim() === "") {
+                    console.log("⚠️ 發送按鈕的 Selector 為空，直接降級使用 Enter 鍵發送...");
                     await this.page.keyboard.press('Enter');
                 } else {
-                    try {
-                        await this.page.waitForSelector(sel.send, { timeout: 2000 });
-                        await this.page.click(sel.send);
-                    } catch (e) { 
-                        await this.page.keyboard.press('Enter'); 
+                    let sendEl = await this.page.$(sel.send);
+                    if (!sendEl) {
+                        console.log("🚑 找不到發送按鈕，呼叫 DOM Doctor...");
+                        const html = await this.page.content();
+                        let newSel = await this.doctor.diagnose(html, 'send');
+                        if (newSel) {
+                            this.selectors.send = cleanSelector(newSel);
+                            console.log(`🧼 [Doctor] 清洗後的 Send Selector: ${this.selectors.send}`);
+                            this.doctor.saveSelectors(this.selectors);
+                            return tryInteract(this.selectors, retryCount + 1);
+                        }
+                        console.log("⚠️ 無法修復按鈕，嘗試使用 Enter 鍵發送...");
+                        await this.page.keyboard.press('Enter');
+                    } else {
+                        try {
+                            await this.page.waitForSelector(sel.send, { timeout: 2000 });
+                            await this.page.click(sel.send);
+                        } catch (e) { 
+                            await this.page.keyboard.press('Enter'); 
+                        }
                     }
                 }
 
