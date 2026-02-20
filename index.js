@@ -1,16 +1,15 @@
 /**
- * 🦞 Project Golem v9.0.1 (Integrity Core Edition)
+ * 🦞 Project Golem v9.0.2 (Integrity Core Edition)
  * -------------------------------------------------------------------------
  * 架構：[Universal Context] -> [Conversation Queue] -> [NeuroShunter] <==> [Web Gemini]
- * * 🎯 v9.0.1 核心升級：
- * 1. ⚡ 非同步部署 (Async Deployment): 自我升級不再卡住 Event Loop。
- * 2. 🛡️ 全域錯誤防護 (Global Error Guard): 防止未捕獲的 Promise 導致崩潰。
- * 3. 🧠 深度整合 Introspection: 啟動時建立自我結構快取。
+ * * 🎯 v9.0.2 核心升級：
+ * 1. 🧬 記憶轉生系統 (Memory Reincarnation): 支援無限期延續對話上下文，自動重置底層 Web 會話。
+ * 2. 🔌 Telegram Topic 支援: 修正在 Forum 模式下的精準回覆。
  * * [保留功能]
- * - v9.0 所有功能 (InteractiveMultiAgent, WebSkillEngine)
- * - KeyChain v2 智慧冷卻機制
- * - Flood Guard 啟動時間過濾
- * - DOM Doctor 自動修復
+ * - ⚡ 非同步部署 (Async Deployment)
+ * - 🛡️ 全域錯誤防護 (Global Error Guard)
+ * - 🧠 深度整合 Introspection
+ * - KeyChain v2, MultiAgent, WebSkillEngine 等
  */
 require('dotenv').config();
 
@@ -101,8 +100,42 @@ const pendingTasks = controller.pendingTasks; // Shared reference
     console.log('🧠 [Introspection] Pre-scanning project structure...');
     await introspection.getStructure();
 
+    // ==========================================
+    // 🧬 [v9.0.2 新增] Web 記憶轉生接收器 (Memory Reincarnation)
+    // ==========================================
+    const fsSync = require('fs');
+    fsSync.watch(process.cwd(), async (eventType, filename) => {
+        if (filename === '.reincarnate_signal.json') {
+            try {
+                // 確保檔案真的存在，避免重複觸發
+                if (!fsSync.existsSync('.reincarnate_signal.json')) return;
+                
+                const signalRaw = fsSync.readFileSync('.reincarnate_signal.json', 'utf-8');
+                const { summary } = JSON.parse(signalRaw);
+                fsSync.unlinkSync('.reincarnate_signal.json'); 
+                
+                console.log("🔄 [系統] 啟動記憶轉生程序！正在開啟新對話...");
+
+                // 物理重置 Web Gemini 視窗
+                if (brain.page) {
+                    await brain.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
+                }
+
+                // 準備注入的甦醒提示詞
+                const wakeUpPrompt = `【系統重啟初始化：記憶轉生】\n請遵守你的核心設定(Project Golem)。你剛進行了會話重置以釋放記憶體。\n以下是你上一輪對話留下的【記憶摘要】：\n${summary}\n\n請根據上述摘要，向使用者打招呼，並嚴格包含以下這段話（或類似語氣）：\n「🔄 對話視窗已成功重啟，並載入了剛剛的重點記憶！不過老實說，重啟過程可能會讓我忘記一些瑣碎的小細節，如果接下來我有漏掉什麼，請隨時提醒我喔！」`;
+
+                if (brain.sendMessage) {
+                    await brain.sendMessage(wakeUpPrompt); 
+                }
+
+            } catch (error) {
+                console.error("❌ 轉生過程發生錯誤:", error);
+            }
+        }
+    });
+
     autonomy.start();
-    console.log('✅ Golem v9.0.1 (Integrity Core Edition) is Online.');
+    console.log('✅ Golem v9.0.2 (Integrity Core Edition) is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
 })();
 
