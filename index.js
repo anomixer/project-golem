@@ -154,6 +154,44 @@ async function handleUnifiedMessage(ctx) {
         return;
     }
 
+    // 🚨 ==========================================
+    // 🚑 [緊急後門] SOS 物理急救與重啟
+    // ==========================================
+    if (ctx.isAdmin && ctx.text && ctx.text.trim().toLowerCase() === '/sos') {
+        await ctx.reply("🚨 [SOS 緊急協定啟動] 正在強制清除可能污染的快取檔並重啟系統...");
+        try {
+            const fsSync = require('fs');
+            const path = require('path');
+            
+            // 1. 定義要清除的「毒蘋果」名單 (包含常見的存放位置)
+            const toxicFiles = [
+                path.join(process.cwd(), 'selectors.json'),
+                path.join(process.cwd(), 'src', 'core', 'selectors.json')
+            ];
+
+            // 2. 執行物理刪除
+            for (const file of toxicFiles) {
+                if (fsSync.existsSync(file)) {
+                    fsSync.unlinkSync(file);
+                    console.log(`🗑️ [SOS] 已刪除污染檔案: ${file}`);
+                }
+            }
+
+            await ctx.reply("✅ 潛在的污染檔案已清除，正在重新啟動 Golem 進程...");
+            
+            // 3. 呼叫 Node.js 重啟自己
+            const { spawn } = require('child_process');
+            const subprocess = spawn(process.argv[0], process.argv.slice(1), { detached: true, stdio: 'ignore' });
+            subprocess.unref();
+            process.exit(0);
+
+        } catch (e) {
+            await ctx.reply(`❌ 緊急重啟失敗，需要手動終端機介入: ${e.message}`);
+        }
+        return; // 🛑 終止後續處理，絕對不讓這條指令進入 AI 大腦
+    }
+    // 🚨 ==========================================
+
     // ✨ [v9.0 保留] 優先檢查：是否在 MultiAgent 等待用戶輸入
     if (global.multiAgentListeners && global.multiAgentListeners.has(ctx.chatId)) {
         const callback = global.multiAgentListeners.get(ctx.chatId);
