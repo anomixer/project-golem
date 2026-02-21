@@ -1,14 +1,15 @@
 /**
- * 🦞 Project Golem v9.0.2 (Integrity Core Edition)
+ * 🦞 Project Golem v9.0.3 (Integrity Core Edition)
  * -------------------------------------------------------------------------
  * 架構：[Universal Context] -> [Conversation Queue] -> [NeuroShunter] <==> [Web Gemini]
- * * 🎯 V9.0.2 核心升級：
+ * * 🎯 V9.0.3 核心升級：
  * 1. 🧬 記憶轉生系統 (Memory Reincarnation): 支援無限期延續對話上下文，自動重置底層 Web 會話。
  * 2. 🔌 Telegram Topic 支援: 修正在 Forum 模式下的精準回覆。
  * 3. 🚑 輕量級 SOS 急救: 不重啟進程，單純物理刪除污染快取，觸發 DOM Doctor 無縫修復。
  * 4. 🧠 智慧指令引擎: Node.js 原生支援解析結構化技能，自動處理 Bash 引號跳脫防呆。
  * 5. 🔗 強韌神經連結 (v2): 徹底修復 APPROVE 授權後的結果斷鏈問題，確保 [System Observation] 必定回傳。
  * 6. 🔄 物理重生指令 (/new): 強制導回 Gemini 根目錄以開啟全新對話，並清除狀態快取。
+ * 7. 💥 徹底轉生指令 (/new_memory): 物理清空底層 DB 並重置對話。
  * * [保留功能]
  * - ⚡ 非同步部署 (Async Deployment)
  * - 🛡️ 全域錯誤防護 (Global Error Guard)
@@ -114,7 +115,7 @@ const pendingTasks = controller.pendingTasks;
     });
 
     autonomy.start();
-    console.log('✅ Golem v9.0.2 (Integrity Core Edition) is Online.');
+    console.log('✅ Golem v9.0.3 (Integrity Core Edition) is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
 })();
 
@@ -174,6 +175,29 @@ async function handleUnifiedMessage(ctx) {
             await ctx.reply(`❌ 物理重置失敗: ${e.message}`);
         }
         return; // 🛑 終止後續處理，不讓這句 /new 傳給 AI
+    }
+
+    // ✨ [新增] /new_memory - 徹底清空 DB 並開啟新對話
+    if (ctx.isAdmin && ctx.text && ctx.text.trim().toLowerCase() === '/new_memory') {
+        await ctx.reply("💥 收到 /new_memory 指令！正在為您物理清空底層 DB 並執行深度轉生...");
+        try {
+            // 1. 呼叫底層 Memory Driver 清空 DB
+            if (brain.memoryDriver && typeof brain.memoryDriver.clearMemory === 'function') {
+                await brain.memoryDriver.clearMemory();
+            }
+            
+            // 2. 重新啟動對話視窗
+            if (brain.page) {
+                await brain.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
+                await brain.init(true); 
+                await ctx.reply("✅ 記憶庫 DB 已徹底清空格式化！網頁也已重置，這是一個 100% 空白、無任何歷史包袱的 Golem 實體。");
+            } else {
+                await ctx.reply("⚠️ 找不到活躍的網頁視窗。");
+            }
+        } catch (e) {
+            await ctx.reply(`❌ 深度轉生失敗: ${e.message}`);
+        }
+        return; 
     }
 
     if (global.multiAgentListeners && global.multiAgentListeners.has(ctx.chatId)) {
@@ -289,14 +313,12 @@ async function handleUnifiedCallback(ctx, actionData) {
                 return; 
             }
 
-            // 🧠 【神經貫通修復核心】強制使用 Native Exec
             const util = require('util');
             const execPromise = util.promisify(require('child_process').exec);
             
             let execResult = "";
             let finalOutput = "";
             try {
-                // 給予腳本最高 45 秒的執行時間，並限制最大 buffer (10MB) 避免長內容撐爆記憶體
                 const { stdout, stderr } = await execPromise(cmd, { timeout: 45000, maxBuffer: 1024 * 1024 * 10 });
                 finalOutput = (stdout || stderr || "✅ 指令執行成功，無特殊輸出").trim();
                 execResult = `[Step ${nextIndex + 1} Success] cmd: ${cmd}\nResult:\n${finalOutput}`;
@@ -307,7 +329,6 @@ async function handleUnifiedCallback(ctx, actionData) {
                 console.error(`❌ [Executor] 執行錯誤: ${e.message}`);
             }
 
-            // ✨ 【關鍵修復】如果內容太長，主動幫它裁切
             const MAX_LENGTH = 15000;
             if (execResult.length > MAX_LENGTH) {
                 execResult = execResult.substring(0, MAX_LENGTH) + `\n\n... (為保護記憶體，內容已截斷，共省略 ${execResult.length - MAX_LENGTH} 字元) ...`;
