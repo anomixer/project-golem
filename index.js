@@ -11,7 +11,7 @@
  * 6. 🔄 物理重生指令 (/new): 強制導回 Gemini 根目錄以開啟全新對話，並清除狀態快取。
  * 7. 💥 徹底轉生指令 (/new_memory): 物理清空底層 DB 並重置對話。
  * 8. 🤖 實體模型切換 (/model): 根據最新版 Web UI，實體操作切換 Fast / Thinking / Pro。
- * * [保留功能]
+ * * [保留功能] 
  * - ⚡ 非同步部署 (Async Deployment)
  * - 🛡️ 全域錯誤防護 (Global Error Guard)
  * - 🧠 深度整合 Introspection
