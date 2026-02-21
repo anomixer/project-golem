@@ -1,7 +1,7 @@
 const path = require('path');
 
 // ============================================================
-// 🧠 Memory Drivers (雙模記憶驅動 + 排程擴充)
+// 🧠 Memory Drivers (雙模記憶驅動 + 排程擴充 + 物理清空)
 // ============================================================
 class BrowserMemoryDriver {
     constructor(brain) { this.brain = brain; }
@@ -41,6 +41,19 @@ class BrowserMemoryDriver {
         return await this.brain.memoryPage.evaluate(async () => {
             return window.checkSchedule ? await window.checkSchedule() : [];
         });
+    }
+
+    // ✨ [新增] 物理清空整個 Memory DB
+    async clearMemory() {
+        if (!this.brain.memoryPage) return;
+        try {
+            await this.brain.memoryPage.evaluate(async () => {
+                if (window.clearAllMemory) await window.clearAllMemory();
+            });
+            console.log("🗑️ [Memory:Browser] IndexedDB 已被物理清空。");
+        } catch (e) {
+            console.error("❌ [Memory:Browser] 清空 DB 失敗:", e.message);
+        }
     }
 }
 
