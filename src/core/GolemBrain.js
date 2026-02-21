@@ -284,14 +284,12 @@ Your response must be parsed into 3 sections using these specific tags:
                 const targetKeywords = modeKeywords[mode] || [mode];
 
                 // 1. 尋找畫面底部含有目標關鍵字的按鈕 (這可能是展開選單的按鈕)
-                // 我們先尋找任何可能代表模型切換的按鈕
                 const allKnownKeywords = [...modeKeywords.fast, ...modeKeywords.thinking, ...modeKeywords.pro];
                 const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
                 let pickerBtn = null;
 
                 for (const btn of buttons) {
                     const txt = (btn.innerText || "").toLowerCase().trim();
-                    // 按鈕文字包含任何已知模式的關鍵字，且高度合理
                     if (allKnownKeywords.some(k => txt.includes(k.toLowerCase())) && btn.offsetHeight > 10 && btn.offsetHeight < 60) {
                         const rect = btn.getBoundingClientRect();
                         // 根據截圖，該按鈕位於畫面下半部
@@ -318,23 +316,44 @@ Your response must be parsed into 3 sections using these specific tags:
                 await delay(1000); // 等待選單彈出動畫
 
                 // 2. 尋找選單中對應的目標模式 (比對中英文關鍵字)
-                const items = Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], [role="radio"], li, .menu-item, div'));
+                const items = Array.from(document.querySelectorAll('*'));
                 let targetElement = null;
+                let bestMatch = null;
 
                 for (const el of items) {
-                    const txt = (el.innerText || "").toLowerCase();
-                    // 檢查元素的文字是否包含目標模式的*任何一個*關鍵字
+                    // 排除觸發按鈕本身，避免點到自己導致選單關閉
+                    if (pickerBtn === el || pickerBtn.contains(el)) continue;
+
+                    // 排除不可見的元素
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) continue;
+
+                    const txt = (el.innerText || "").trim().toLowerCase();
+                    
+                    // 【防呆關鍵】如果文字太長，代表它是大容器 (例如整個網頁 background)，絕對不能點擊
+                    if (txt.length === 0 || txt.length > 50) continue;
+
+                    // 檢查是否包含目標關鍵字
                     if (targetKeywords.some(keyword => txt.includes(keyword.toLowerCase()))) {
-                        // 確保它是個合理的可點擊選項層級
-                        if (el.getAttribute('role') || el.tagName.toLowerCase() === 'li' || (el.tagName.toLowerCase() === 'div' && el.children.length > 0)) {
+                        // 優先尋找帶有標準選單屬性的元素
+                        const role = el.getAttribute('role');
+                        if (role === 'menuitem' || role === 'menuitemradio' || role === 'option') {
                             targetElement = el;
-                            break;
+                            break; // 找到最標準的選項，直接選定中斷
                         }
+                        
+                        // 否則，尋找最深層的元素 (querySelectorAll 由外而內，最後的通常最深)
+                        bestMatch = el;
                     }
                 }
 
+                // 如果找不到標準 role，使用最深層的比對結果
                 if (!targetElement) {
-                    // 若找不到，點擊背景關閉選單避免畫面卡死
+                    targetElement = bestMatch;
+                }
+
+                if (!targetElement) {
+                    // 若真的找不到，點擊背景關閉選單避免畫面卡死
                     document.body.click(); 
                     return `⚠️ 選單已展開，但找不到對應「${mode}」的選項 (已搜尋關鍵字: ${targetKeywords.join(', ')})。您可能目前無法使用該模型。`;
                 }
