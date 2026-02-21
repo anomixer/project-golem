@@ -266,6 +266,79 @@ Your response must be parsed into 3 sections using these specific tags:
         try { await this.memoryDriver.memorize(text, metadata); } catch (e) { }
     }
 
+    // ✨ [新增] 動態視覺腳本：針對新版 UI 切換 Fast / Thinking / Pro (含灰色按鈕防呆)
+    async switchModel(targetMode) {
+        if (!this.page) throw new Error("大腦尚未啟動。");
+        try {
+            const result = await this.page.evaluate(async (mode) => {
+                const delay = (ms) => new Promise(r => setTimeout(r, ms));
+                const knownModels = ['fast', 'thinking', 'pro'];
+                
+                // 1. 尋找畫面底部含有 Fast, Thinking 或 Pro 字眼的按鈕
+                const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
+                let pickerBtn = null;
+
+                for (const btn of buttons) {
+                    const txt = (btn.innerText || "").toLowerCase().trim();
+                    // 按鈕文字通常會是目前選中的模式 (例如 "Fast")，而且高度不會太大
+                    if (knownModels.some(m => txt.includes(m)) && btn.offsetHeight > 10 && btn.offsetHeight < 60) {
+                        const rect = btn.getBoundingClientRect();
+                        // 根據截圖，該按鈕位於畫面下半部
+                        if (rect.top > window.innerHeight / 2) { 
+                            pickerBtn = btn;
+                            break;
+                        }
+                    }
+                }
+
+                if (!pickerBtn) return "⚠️ 找不到畫面底部的模型切換按鈕。UI 可能已變更，或您停留在登入畫面。";
+                
+                // ✨ [核心防呆] 檢查按鈕是否為「灰色不可點擊」狀態
+                const isDisabled = pickerBtn.disabled || 
+                                   pickerBtn.getAttribute('aria-disabled') === 'true' || 
+                                   pickerBtn.classList.contains('disabled');
+                                   
+                if (isDisabled) {
+                    return "⚠️ 模型切換按鈕目前呈現「灰色不可點擊」狀態！這通常是因為您尚未登入 Google 帳號，或該帳號目前沒有權限切換模型。";
+                }
+
+                // 點擊展開選單
+                pickerBtn.click();
+                await delay(1000); // 等待選單彈出動畫
+
+                // 2. 尋找選單中對應的目標模式 (Fast, Thinking, Pro)
+                const items = Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], [role="radio"], li, .menu-item, div'));
+                let targetElement = null;
+
+                // 尋找包含目標字眼且是可點擊層級的元素
+                for (const el of items) {
+                    const txt = (el.innerText || "").toLowerCase();
+                    if (txt.includes(mode)) {
+                        if (el.getAttribute('role') || el.tagName.toLowerCase() === 'li' || (el.tagName.toLowerCase() === 'div' && el.children.length > 0)) {
+                            targetElement = el;
+                            break;
+                        }
+                    }
+                }
+
+                if (!targetElement) {
+                    // 若找不到，點擊背景關閉選單避免畫面卡死
+                    document.body.click(); 
+                    return `⚠️ 選單已展開，但找不到「${mode}」選項。您可能目前無法使用該模型，或免費額度已耗盡。`;
+                }
+
+                // 點擊目標選項
+                targetElement.click();
+                await delay(800);
+                return `✅ 成功為您點擊並切換至 [${mode}] 模式！`;
+            }, targetMode.toLowerCase());
+
+            return result;
+        } catch (error) {
+            return `❌ 視覺腳本執行失敗: ${error.message}`;
+        }
+    }
+
     async sendMessage(text, isSystem = false) {
         if (!this.browser) await this.init();
         try { await this.page.bringToFront(); } catch (e) { }
@@ -395,14 +468,12 @@ ${text}`;
                             const startIndex = rawText.indexOf(startTag);
                             const endIndex = rawText.indexOf(endTag);
 
-                            // ✨ [條件 1：完美信封] 看到 END 標籤，0秒延遲瞬間打包回傳！
                             if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
                                 const content = rawText.substring(startIndex + startTag.length, endIndex).trim();
                                 resolve({ status: 'ENVELOPE_COMPLETE', text: content });
                                 return;
                             }
 
-                            // 計算文字穩定度 (有沒有在打字)
                             if (rawText === lastCheckText) {
                                 stableCount++;
                             } else {
@@ -411,23 +482,18 @@ ${text}`;
                             lastCheckText = rawText;
 
                             if (startIndex !== -1) {
-                                // ✨ [條件 2：已經開始回答] 看到 BEGIN，但遲遲沒看到 END (AI 忘記寫)
-                                // 只要畫面停頓超過 5 秒 (10 次檢查) 沒動靜，就強制截斷回傳，不等 30 秒！
                                 if (stableCount > 10) {
                                     const content = rawText.substring(startIndex + startTag.length).trim();
                                     resolve({ status: 'ENVELOPE_TRUNCATED', text: content });
                                     return;
                                 }
                             } else if (rawText !== oldText && !rawText.includes('SYSTEM: Please WRAP')) {
-                                // ✨ [條件 3：Thinking Mode] 還沒看到 BEGIN，可能在深思
-                                // 給予最高 30 秒 (60 次檢查) 的容忍度，等它想完
                                 if (stableCount > 60) {
                                     resolve({ status: 'FALLBACK_DIFF', text: rawText });
                                     return;
                                 }
                             }
 
-                            // 總超時時間上限 5 分鐘 (300,000 ms)
                             if (Date.now() - startTime > 300000) { 
                                 resolve({ status: 'TIMEOUT', text: '' }); 
                                 return; 
