@@ -1,8 +1,8 @@
 /**
- * 🦞 Project Golem v9.0.3 (Integrity Core Edition)
+ * 🦞 Project Golem v9.0.5 (Model Switcher Edition)
  * -------------------------------------------------------------------------
  * 架構：[Universal Context] -> [Conversation Queue] -> [NeuroShunter] <==> [Web Gemini]
- * * 🎯 V9.0.3 核心升級：
+ * * 🎯 V9.0.5 核心升級：
  * 1. 🧬 記憶轉生系統 (Memory Reincarnation): 支援無限期延續對話上下文，自動重置底層 Web 會話。
  * 2. 🔌 Telegram Topic 支援: 修正在 Forum 模式下的精準回覆。
  * 3. 🚑 輕量級 SOS 急救: 不重啟進程，單純物理刪除污染快取，觸發 DOM Doctor 無縫修復。
@@ -10,6 +10,7 @@
  * 5. 🔗 強韌神經連結 (v2): 徹底修復 APPROVE 授權後的結果斷鏈問題，確保 [System Observation] 必定回傳。
  * 6. 🔄 物理重生指令 (/new): 強制導回 Gemini 根目錄以開啟全新對話，並清除狀態快取。
  * 7. 💥 徹底轉生指令 (/new_memory): 物理清空底層 DB 並重置對話。
+ * 8. 🤖 實體模型切換 (/model): 根據最新版 Web UI，實體操作切換 Fast / Thinking / Pro。
  * * [保留功能]
  * - ⚡ 非同步部署 (Async Deployment)
  * - 🛡️ 全域錯誤防護 (Global Error Guard)
@@ -115,7 +116,7 @@ const pendingTasks = controller.pendingTasks;
     });
 
     autonomy.start();
-    console.log('✅ Golem v9.0.3 (Integrity Core Edition) is Online.');
+    console.log('✅ Golem v9.0.5 (Model Switcher Edition) is Online.');
     if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
 })();
 
@@ -156,17 +157,12 @@ async function handleUnifiedMessage(ctx) {
         return; 
     }
 
-    // ✨ [新增] /new - 強制開啟新對話並重新注入設定檔
     if (ctx.isAdmin && ctx.text && ctx.text.trim().toLowerCase() === '/new') {
         await ctx.reply("🔄 收到 /new 指令！正在為您開啟全新的大腦對話神經元...");
         try {
             if (brain.page) {
-                // 1. 強制導向乾淨的根目錄，Gemini 伺服器會自動判定為開啟新對話
                 await brain.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
-                
-                // 2. 重新注入核心大腦設定檔 (System Prompt)
                 await brain.init(true); 
-                
                 await ctx.reply("✅ 物理重置完成！已經為您切斷舊有記憶，現在這是一個全新且乾淨的 Golem 實體。");
             } else {
                 await ctx.reply("⚠️ 找不到活躍的網頁視窗，無法執行物理重置。");
@@ -174,19 +170,15 @@ async function handleUnifiedMessage(ctx) {
         } catch (e) {
             await ctx.reply(`❌ 物理重置失敗: ${e.message}`);
         }
-        return; // 🛑 終止後續處理，不讓這句 /new 傳給 AI
+        return; 
     }
 
-    // ✨ [新增] /new_memory - 徹底清空 DB 並開啟新對話
     if (ctx.isAdmin && ctx.text && ctx.text.trim().toLowerCase() === '/new_memory') {
         await ctx.reply("💥 收到 /new_memory 指令！正在為您物理清空底層 DB 並執行深度轉生...");
         try {
-            // 1. 呼叫底層 Memory Driver 清空 DB
             if (brain.memoryDriver && typeof brain.memoryDriver.clearMemory === 'function') {
                 await brain.memoryDriver.clearMemory();
             }
-            
-            // 2. 重新啟動對話視窗
             if (brain.page) {
                 await brain.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
                 await brain.init(true); 
@@ -196,6 +188,31 @@ async function handleUnifiedMessage(ctx) {
             }
         } catch (e) {
             await ctx.reply(`❌ 深度轉生失敗: ${e.message}`);
+        }
+        return; 
+    }
+
+    // ✨ [新增] /model 指令實作
+    if (ctx.isAdmin && ctx.text && ctx.text.trim().toLowerCase().startsWith('/model')) {
+        const args = ctx.text.trim().split(/\s+/);
+        const targetModel = args[1] ? args[1].toLowerCase() : '';
+        
+        // 根據截圖防呆，只允許 fast, thinking, pro
+        if (!['fast', 'thinking', 'pro'].includes(targetModel)) {
+            await ctx.reply("ℹ️ 請輸入正確的模組關鍵字，例如：\n`/model fast` (回答速度快)\n`/model thinking` (具備深度思考)\n`/model pro` (進階程式碼與數學能力)");
+            return;
+        }
+
+        await ctx.reply(`🔄 啟動視覺神經，嘗試為您操作網頁切換至 [${targetModel}] 模式...`);
+        try {
+            if (typeof brain.switchModel === 'function') {
+                const result = await brain.switchModel(targetModel);
+                await ctx.reply(result);
+            } else {
+                await ctx.reply("⚠️ 您的 GolemBrain 尚未掛載 switchModel 功能，請確認檔案是否已更新。");
+            }
+        } catch (e) {
+            await ctx.reply(`❌ 切換模組失敗: ${e.message}`);
         }
         return; 
     }
