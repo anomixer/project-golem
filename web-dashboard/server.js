@@ -10,6 +10,19 @@ class WebServer {
         this.app = express();
         this.app.use(express.json()); // Enable JSON body parsing
         this.server = http.createServer(this.app);
+
+        // Security & Cleanup Middleware
+        this.app.use((req, res, next) => {
+            // Set a sensible CSP to avoid Chrome defaults blocking things during redirects
+            res.setHeader('Content-Security-Policy', "default-src 'self'; connect-src 'self' ws: wss:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;");
+            next();
+        });
+
+        // Silencing Chrome's default searching for devtools config to avoid 404 noise
+        this.app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
+            res.json({});
+        });
+
         this.io = new Server(this.server, {
             cors: {
                 origin: "*", // Allow Next.js dev server
