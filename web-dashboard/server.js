@@ -535,6 +535,18 @@ class WebServer {
             }, 1000);
         });
 
+        this.app.post('/api/system/shutdown', (req, res) => {
+            console.log("⛔ [WebServer] Received shutdown request. Stopping system...");
+            res.json({ success: true, message: "System is shutting down..." });
+
+            // 直接終止進程，不 spawn 新子進程
+            // 與 reload 的差異：reload 會生出新進程再死去（熱重啟），shutdown 則完全停止
+            // Single mode / Multi mode 皆適用（都是同一個 Node.js 進程）
+            setTimeout(() => {
+                process.exit(0);
+            }, 1000);
+        });
+
         // Socket.io connection handler
         this.io.on('connection', (socket) => {
             const getGolemsData = () => {
