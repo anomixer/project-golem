@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Plus, RefreshCw, Trash2, Search, Filter, Database } from "lucide-react";
+import { Copy, Plus, RefreshCw, Trash2, Search, Filter, Database, Download, Upload } from "lucide-react";
 import { useGolem } from "@/components/GolemContext";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +18,10 @@ export function MemoryTable() {
     const [loading, setLoading] = useState(false);
     const [newMemory, setNewMemory] = useState("");
     const [isWiping, setIsWiping] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterType, setFilterType] = useState<string>("all");
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const fetchMemories = async () => {
         if (!activeGolem) return;
@@ -74,6 +76,53 @@ export function MemoryTable() {
             console.error("Failed to wipe memory", e);
         } finally {
             setIsWiping(false);
+        }
+    };
+
+    const exportMemory = () => {
+        if (!activeGolem) return;
+        window.location.href = `/api/memory/export?golemId=${encodeURIComponent(activeGolem)}`;
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !activeGolem) return;
+
+        setIsImporting(true);
+        try {
+            const text = await file.text();
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+                if (!Array.isArray(parsed)) throw new Error("Must be an array");
+            } catch (e) {
+                alert("Invalid JSON file format.");
+                setIsImporting(false);
+                return;
+            }
+
+            const res = await fetch(`/api/memory/import?golemId=${encodeURIComponent(activeGolem)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(parsed)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Successfully imported ${data.count} memories.`);
+                fetchMemories();
+            } else {
+                alert(`Import failed: ${data.error}`);
+            }
+        } catch (e: any) {
+            console.error("Import failed:", e);
+            alert(`Import error: ${e.message}`);
+        } finally {
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
@@ -226,20 +275,49 @@ export function MemoryTable() {
 
             {/* Footer Toolbar */}
             <div className="flex justify-between items-center pt-2 border-t border-gray-800/50">
-                <div className="text-xs text-gray-500 font-mono">
+                <div className="text-xs text-gray-500 font-mono flex items-center">
                     Total Records: {filteredMemories.length} {searchQuery && `(Filtered from ${memories.length})`}
                 </div>
 
-                <Button
-                    variant="ghost"
-                    onClick={wipeMemory}
-                    disabled={isWiping || memories.length === 0}
-                    className="h-8 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-                    size="sm"
-                >
-                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                    {isWiping ? "Purging..." : "Wipe Database"}
-                </Button>
+                <div className="flex space-x-2">
+                    <input
+                        type="file"
+                        accept="application/json"
+                        ref={fileInputRef}
+                        className="hidden"
+                        onChange={handleFileChange}
+                    />
+                    <Button
+                        variant="ghost"
+                        onClick={handleImportClick}
+                        disabled={isImporting}
+                        className="h-8 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                        size="sm"
+                    >
+                        <Upload className={cn("w-3.5 h-3.5 mr-1.5", isImporting && "animate-bounce")} />
+                        {isImporting ? "Importing..." : "Import DB"}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        onClick={exportMemory}
+                        disabled={memories.length === 0}
+                        className="h-8 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors"
+                        size="sm"
+                    >
+                        <Download className="w-3.5 h-3.5 mr-1.5" />
+                        Export DB
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        onClick={wipeMemory}
+                        disabled={isWiping || memories.length === 0}
+                        className="h-8 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                        size="sm"
+                    >
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                        {isWiping ? "Purging..." : "Wipe Database"}
+                    </Button>
+                </div>
             </div>
         </div>
     );

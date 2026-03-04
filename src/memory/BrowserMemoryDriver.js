@@ -93,6 +93,20 @@ class BrowserMemoryDriver {
             console.error("❌ [Memory:Browser] 清空 DB 失敗:", e.message);
         }
     }
+
+    async exportMemory() {
+        if (!this.brain.memoryPage) return "[]";
+        return await this.brain.memoryPage.evaluate(async () => {
+            return window.exportMemories ? await window.exportMemories() : "[]";
+        });
+    }
+
+    async importMemory(jsonData) {
+        if (!this.brain.memoryPage) return { success: false, error: "Memory engine not ready" };
+        return await this.brain.memoryPage.evaluate(async (data) => {
+            return window.importMemories ? await window.importMemories(data) : { success: false, error: "Not supported" };
+        }, jsonData);
+    }
 }
 
 module.exports = BrowserMemoryDriver;

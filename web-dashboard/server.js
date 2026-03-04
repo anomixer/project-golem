@@ -112,6 +112,47 @@ class WebServer {
             }
         });
 
+        this.app.get('/api/memory/export', async (req, res) => {
+            const golemId = req.query.golemId || (this.contexts.size > 0 ? Array.from(this.contexts.keys())[0] : null);
+            const context = golemId ? this.contexts.get(golemId) : null;
+            if (!context || !context.memory) return res.status(503).json({ error: "Memory not engaged" });
+            try {
+                if (typeof context.memory.exportMemory === 'function') {
+                    const data = await context.memory.exportMemory();
+                    res.setHeader('Content-disposition', `attachment; filename=memory_${golemId || 'export'}_${Date.now()}.json`);
+                    res.setHeader('Content-type', 'application/json');
+                    return res.send(data);
+                } else {
+                    return res.status(501).json({ error: "Export memory not supported by this driver" });
+                }
+            } catch (e) {
+                return res.status(500).json({ error: e.message });
+            }
+        });
+
+        this.app.post('/api/memory/import', async (req, res) => {
+            const golemId = req.query.golemId || (this.contexts.size > 0 ? Array.from(this.contexts.keys())[0] : null);
+            const context = golemId ? this.contexts.get(golemId) : null;
+            if (!context || !context.memory) return res.status(503).json({ error: "Memory not engaged" });
+
+            try {
+                if (typeof context.memory.importMemory === 'function') {
+                    const jsonData = req.body;
+                    // body is parsed as object if we use express.json(), need it as string for evaluate
+                    const result = await context.memory.importMemory(JSON.stringify(jsonData));
+                    if (result.success) {
+                        return res.json(result);
+                    } else {
+                        return res.status(400).json(result);
+                    }
+                } else {
+                    return res.status(501).json({ error: "Import memory not supported by this driver" });
+                }
+            } catch (e) {
+                return res.status(500).json({ error: e.message });
+            }
+        });
+
         this.app.post('/api/memory', async (req, res) => {
             const golemId = req.query.golemId || (this.contexts.size > 0 ? Array.from(this.contexts.keys())[0] : null);
             const context = golemId ? this.contexts.get(golemId) : null;
