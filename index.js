@@ -18,7 +18,23 @@
  * - 🧠 深度整合 Introspection
  * - v9.0 所有功能 (InteractiveMultiAgent, WebSkillEngine)
  */
-require('dotenv').config();
+const fs_sync = require('fs');
+const path_sync = require('path');
+
+// ── 首次啟動自動初始化 .env ────────────────────────────────────────────────
+const envPath = path_sync.resolve(__dirname, '.env');
+const envExamplePath = path_sync.resolve(__dirname, '.env.example');
+if (!fs_sync.existsSync(envPath) && fs_sync.existsSync(envExamplePath)) {
+    fs_sync.copyFileSync(envExamplePath, envPath);
+    console.log('📋 [Bootstrap] .env 不存在，已從 .env.example 複製初始設定檔。');
+    console.log('🌐 [Bootstrap] 請前往 http://localhost:3000/dashboard 完成初始化設定。');
+}
+
+try {
+    require('dotenv').config();
+} catch (e) {
+    console.error('⚠️ [Bootstrap] 尚未安裝依賴套件 (dotenv)。請確保已執行 npm install。');
+}
 
 process.on('uncaughtException', (err) => {
     console.error('🔥 [CRITICAL] Uncaught Exception:', err);
@@ -29,15 +45,12 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Reason:', reason);
 });
 
-if (process.argv.includes('dashboard')) {
-    try {
-        require('./dashboard');
-        console.log("✅ 戰術控制台已啟動 (繁體中文版)");
-    } catch (e) {
-        console.error("❌ 無法載入 Dashboard:", e.message);
-    }
-} else {
-    console.log("ℹ️  以標準模式啟動 (無 Dashboard)。若需介面請輸入 'npm start dashboard'");
+// Dashboard 強制啟用
+try {
+    require('./dashboard');
+    console.log('✅ Golem Web Dashboard 已啟動 → http://localhost:' + (process.env.DASHBOARD_PORT || 3000));
+} catch (e) {
+    console.error('❌ 無法載入 Dashboard:', e.message);
 }
 
 const fs = require('fs').promises;
@@ -50,8 +63,7 @@ const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { CONFIG, GOLEMS_CONFIG, MEMORY_BASE_DIR, LOG_BASE_DIR, GOLEM_MODE } = require('./src/config');
 const SystemLogger = require('./src/utils/SystemLogger');
 
-// 🚀 初始化系統日誌持久化
-SystemLogger.init(LOG_BASE_DIR);
+// 🚀 初始化系統日誌持久化已移至 ensureCoreServices (按需啟動)
 
 const GolemBrain = require('./src/core/GolemBrain');
 const TaskController = require('./src/core/TaskController');
@@ -65,23 +77,14 @@ const SystemUpgrader = require('./src/managers/SystemUpgrader');
 const InteractiveMultiAgent = require('./src/core/InteractiveMultiAgent');
 const introspection = require('./src/services/Introspection');
 
+// 🎯 V9.0.7 解耦：不再於啟動時遍歷配置建立 Bot 與實體
+// TelegramBot 與 Golem 實體將由 Web Dashboard 透過 golemFactory 動態建立
 const telegramBots = new Map();
-if (GOLEMS_CONFIG && GOLEMS_CONFIG.length > 0) {
-    for (const config of GOLEMS_CONFIG) {
-        if (!config.tgToken) continue;
-        try {
-            const bot = new TelegramBot(config.tgToken, { polling: true });
-            bot.golemConfig = config;
-            bot.getMe().then(me => {
-                bot.username = me.username;
-                console.log(`🤖 [Bot] ${config.id} 已上線，Username: @${me.username}`);
-            }).catch(e => console.warn(`⚠️ [Bot] ${config.id} 無法獲取 Bot 資訊:`, e.message));
-            telegramBots.set(config.id, bot);
-        } catch (e) {
-            console.error(`❌ [Bot] 初始化 ${config.id} Telegram 失敗:`, e.message);
-        }
-    }
-}
+const discordBots = new Map();
+const activeGolems = new Map();
+
+// ✅ [Bug #6 修復] 啟動時間戳記，用於過濾重啟前的舊訊息
+const BOOT_TIME = Date.now();
 
 const dcClient = CONFIG.DC_TOKEN ? new Client({
     intents: [
@@ -96,13 +99,6 @@ const dcClient = CONFIG.DC_TOKEN ? new Client({
 // ==========================================
 // 🧠 雙子管弦樂團 (Golem Orchestrator)
 // ==========================================
-const activeGolems = new Map();
-
-/**
- * 取得或建立 Golem 實體
- * @param {string} golemId 
- * @returns {Object} { brain, controller, autonomy, convoManager }
- */
 function getOrCreateGolem(golemId) {
     if (activeGolems.has(golemId)) return activeGolems.get(golemId);
 
@@ -129,85 +125,54 @@ function getOrCreateGolem(golemId) {
     });
 
     const boundBot = telegramBots.get(golemId) || (telegramBots.size > 0 ? telegramBots.values().next().value : null);
-    autonomy.setIntegrations(boundBot, dcClient, convoManager);
+    const boundDcBot = discordBots.get(golemId) || (discordBots.size > 0 ? discordBots.values().next().value : null);
+
+    autonomy.setIntegrations(boundBot, boundDcBot || dcClient, convoManager);
     brain.tgBot = boundBot; // expose for dashboard notifications
+    brain.dcBot = boundDcBot || dcClient;
 
     const instance = { brain, controller, autonomy, convoManager };
     activeGolems.set(golemId, instance);
     return instance;
 }
 
-// 根據 GOLEMS_CONFIG 預先註冊所有的 Golem 實體
-const initialGolems = [];
-if (GOLEMS_CONFIG && GOLEMS_CONFIG.length > 0) {
-    for (const config of GOLEMS_CONFIG) {
-        initialGolems.push(getOrCreateGolem(config.id));
-    }
-} else {
-    initialGolems.push(getOrCreateGolem('golem_A'));
-}
-
-const BOOT_TIME = Date.now();
-console.log(`🛡️ [Flood Guard] 系統啟動時間: ${new Date(BOOT_TIME).toLocaleString('zh-TW', { hour12: false })}`);
-
 (async () => {
     if (process.env.GOLEM_TEST_MODE === 'true') { console.log('🚧 GOLEM_TEST_MODE active.'); return; }
 
-    // 平行啟動所有大腦，預防缺失 Persona 設定
-    const personaManager = require('./src/skills/core/persona');
-    await Promise.all(initialGolems.map(async (instance) => {
-        // 確保 Dashboard 能提早註冊此 Golem，即便尚未初始化瀏覽器
-        if (typeof instance.brain._linkDashboard === 'function') {
-            instance.brain._linkDashboard();
-        }
+    // 🎯 V9.0.7 解耦：啟動時不再遍歷建立 initialGolems
+    // 也延後架構掃描與巡檢，直到第一個實體啟動
+    let _isCoreInitialized = false;
+    async function ensureCoreServices() {
+        if (_isCoreInitialized) return;
 
-        // Check if persona exists for this golem
-        const hasPersona = personaManager.exists(instance.brain.userDataDir);
-        if (!hasPersona) {
-            console.log(`⚠️ [System] Golem ${instance.brain.golemId} 尚未完成初始化設定 (pending_setup)，暫停啟動瀏覽器。`);
-            instance.brain.status = 'pending_setup';
+        // 🚀 初始化系統日誌持久化 (按需啟動)
+        SystemLogger.init(LOG_BASE_DIR);
+        if (GOLEM_MODE === 'SINGLE') {
+            console.log('📡 [Config] 運行模式: 單機 (GOLEM_MODE=SINGLE)');
         } else {
-            instance.brain.status = 'running';
-            await instance.brain.init();
-
-            // 📣 通知 TG 重啟完成
-            const tgBot = instance.brain.tgBot;
-            if (tgBot) {
-                const gCfg = tgBot.golemConfig || {};
-                const targetId = gCfg.adminId || gCfg.chatId;
-                if (targetId) {
-                    const { resolveEnabledSkills, MANDATORY_SKILLS, OPTIONAL_SKILLS: OPT_LIST } = require('./src/skills/skillsConfig');
-                    const enabledSkills = resolveEnabledSkills(process.env.OPTIONAL_SKILLS || '', []);
-                    const enabledOptional = OPT_LIST.filter(s => enabledSkills.has(s));
-                    const skillSummary = enabledOptional.length > 0
-                        ? `\n✅ 選用技能: ${enabledOptional.join(', ')}`
-                        : '';
-                    tgBot.sendMessage(
-                        targetId,
-                        `✅ *[${instance.brain.golemId}] Golem 重啟完成！*\n已載入 ${MANDATORY_SKILLS.length} 個必要技能${skillSummary}\n\n記憶與技能書載入成功，可以繼續使用。`,
-                        { parse_mode: 'Markdown' }
-                    ).catch(e => console.warn(`⚠️ [System] TG boot notify failed [${instance.brain.golemId}]:`, e.message));
-                }
-            }
+            console.log(`📡 [Config] 運行模式: 多機 (${GOLEMS_CONFIG.length} 實體)`);
         }
-    }));
 
-    console.log('🧠 [Introspection] Pre-scanning project structure...');
-    await introspection.getStructure();
+        console.log('🧠 [Introspection] Scanning project structure...');
+        await introspection.getStructure().catch(e => console.warn('⚠️ Introspection failed:', e.message));
 
+        // 啟動排程器
+        setInterval(runTieredCompression, 6 * 60 * 60 * 1000);
+        runTieredCompression();
+
+        if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
+
+        _isCoreInitialized = true;
+    }
     const fsSync = require('fs');
     fsSync.watch(process.cwd(), async (eventType, filename) => {
         if (filename === '.reincarnate_signal.json') {
             try {
                 if (!fsSync.existsSync('.reincarnate_signal.json')) return;
-
                 const signalRaw = fsSync.readFileSync('.reincarnate_signal.json', 'utf-8');
                 const { summary } = JSON.parse(signalRaw);
                 fsSync.unlinkSync('.reincarnate_signal.json');
-
                 console.log("🔄 [系統] 啟動記憶轉生程序！正在開啟新對話...");
-
-                // 廣播給所有 active 的 Golem
                 for (const [id, instance] of activeGolems.entries()) {
                     if (instance.brain.page) {
                         await instance.brain.page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
@@ -217,60 +182,121 @@ console.log(`🛡️ [Flood Guard] 系統啟動時間: ${new Date(BOOT_TIME).toL
                         await instance.brain.sendMessage(wakeUpPrompt);
                     }
                 }
-
             } catch (error) {
                 console.error("❌ 轉生過程發生錯誤:", error);
             }
         }
     });
 
-    initialGolems.forEach(instance => {
-        instance.autonomy.start();
-        console.log(`✅ [System][${instance.brain.golemId}] Autonomy Engine is Online.`);
-    });
+    const dashboard = require('./dashboard');
+    if (dashboard && dashboard.webServer && typeof dashboard.webServer.setGolemFactory === 'function') {
+        const TelegramBot = require('node-telegram-bot-api');
+        dashboard.webServer.setGolemFactory(async (golemConfig) => {
+            if (activeGolems.has(golemConfig.id)) {
+                console.log(`⚠️ [Factory] Golem [${golemConfig.id}] already exists, skipping.`);
+                return activeGolems.get(golemConfig.id);
+            }
+            if (golemConfig.tgToken && !telegramBots.has(golemConfig.id)) {
+                try {
+                    const bot = new TelegramBot(golemConfig.tgToken, { polling: false });
+                    bot.golemConfig = golemConfig;
+                    bot.getMe().then(me => {
+                        bot.username = me.username;
+                        console.log(`🤖 [Bot] ${golemConfig.id} 已掛載 (@${me.username})`);
+                    }).catch(e => {
+                        if (!e.message.includes('401')) {
+                            console.warn(`⚠️ [Bot] ${golemConfig.id}:`, e.message);
+                        }
+                    });
+                    telegramBots.set(golemConfig.id, bot);
 
-    // ============================================================
-    // 🏛️ 金字塔式多層記憶壓縮排程器
-    // ============================================================
+                    // ✅ [Bug #1 修復] 在 factory 內部動態綁定事件，確保動態建立的 Bot 也能接收訊息
+                    const boundGolemId = golemConfig.id;
+                    bot.on('message', async (msg) => {
+                        try {
+                            await handleUnifiedMessage(new UniversalContext('telegram', msg, bot), boundGolemId);
+                        } catch (e) {
+                            console.error(`❌ [TG ${boundGolemId}] Message Handler Error:`, e);
+                        }
+                    });
+                    bot.on('callback_query', async (query) => {
+                        try {
+                            await bot.answerCallbackQuery(query.id);
+                        } catch (e) {
+                            console.warn(`⚠️ [TG ${boundGolemId}] Callback Answer Warning: ${e.message}`);
+                        }
+                        try {
+                            await handleUnifiedCallback(
+                                new UniversalContext('telegram', query, bot),
+                                query.data,
+                                boundGolemId
+                            );
+                        } catch (e) {
+                            console.error(`❌ [TG ${boundGolemId}] Callback Handler Error:`, e);
+                        }
+                    });
+                    console.log(`🔗 [Factory] TG events bound for Golem [${boundGolemId}]`);
+                } catch (e) {
+                    console.error(`❌ [Bot] 初始化 ${golemConfig.id} Telegram 失敗:`, e.message);
+                }
+            }
 
-    /**
-     * 多層壓縮巡檢：根據當前日期決定需要觸發哪些層級的壓縮
-     */
+            if (golemConfig.dcToken && !discordBots.has(golemConfig.id)) {
+                try {
+                    const client = new Client({
+                        intents: [
+                            GatewayIntentBits.Guilds,
+                            GatewayIntentBits.GuildMessages,
+                            GatewayIntentBits.MessageContent,
+                            GatewayIntentBits.DirectMessages
+                        ],
+                        partials: [Partials.Channel]
+                    });
+                    client.golemConfig = golemConfig;
+                    client.once('ready', () => {
+                        console.log(`🤖 [Bot] ${golemConfig.id} Discord 已掛載 (${client.user ? client.user.tag : 'Unknown'})`);
+                    });
+
+                    // Bind per-golem Discord events directly to the global handler but force the targetId
+                    client.on('messageCreate', (msg) => {
+                        if (!msg.author.bot) handleUnifiedMessage(new UniversalContext('discord', msg, client), golemConfig.id);
+                    });
+                    client.on('interactionCreate', (interaction) => {
+                        if (interaction.isButton()) handleUnifiedCallback(new UniversalContext('discord', interaction, client), interaction.customId, golemConfig.id);
+                    });
+
+                    client.login(golemConfig.dcToken).catch(e => {
+                        console.warn(`⚠️ [Bot] ${golemConfig.id} Discord Login Failed:`, e.message);
+                    });
+                    discordBots.set(golemConfig.id, client);
+                } catch (e) {
+                    console.error(`❌ [Bot] 初始化 ${golemConfig.id} Discord 失敗:`, e.message);
+                }
+            }
+
+            const instance = getOrCreateGolem(golemConfig.id);
+            await ensureCoreServices();
+            if (typeof instance.brain._linkDashboard === 'function') {
+                instance.brain._linkDashboard();
+            }
+            instance.brain.status = 'pending_setup';
+            instance.autonomy.start();
+            console.log(`✅ [Factory] Golem [${golemConfig.id}] started via Web Dashboard.`);
+            return instance;
+        });
+        console.log('🔗 [System] golemFactory injected into WebServer.');
+    }
+
     async function runTieredCompression() {
         const now = new Date();
+        const month = now.getMonth() + 1;
         const day = now.getDate();
-        const month = now.getMonth() + 1; // 1-12
         const year = now.getFullYear();
-
         console.log(`🕒 [Scheduler] 啟動多層記憶壓縮巡檢...`);
-
         for (const [id, instance] of activeGolems.entries()) {
             const mgr = instance.brain.chatLogManager;
             if (!mgr) continue;
-
-            // Tier 0 → 1: Hourly → Daily (每次巡檢都執行)
-            const yesterday = mgr._getYesterdayDateString();
-            mgr.compressLogsForDate(yesterday, instance.brain).catch(err => {
-                console.error(`❌ [Scheduler][${id}] Daily 壓縮失敗: ${err.message}`);
-            });
-
-            // Tier 1 → 2: Daily → Monthly (每月 1 號觸發上個月的壓縮)
-            if (day === 1) {
-                const lastMonth = mgr._getLastMonthString();
-                mgr.compressMonthly(lastMonth, instance.brain).catch(err => {
-                    console.error(`❌ [Scheduler][${id}] Monthly 壓縮失敗: ${err.message}`);
-                });
-            }
-
-            // Tier 2 → 3: Monthly → Yearly (每年 1/1 觸發上一年的壓縮)
-            if (month === 1 && day === 1) {
-                const lastYear = mgr._getLastYearString();
-                mgr.compressYearly(lastYear, instance.brain).catch(err => {
-                    console.error(`❌ [Scheduler][${id}] Yearly 壓縮失敗: ${err.message}`);
-                });
-            }
-
-            // Tier 3 → 4: Yearly → Era (每逢十年邊界的 1/1 觸發)
+            console.log(`📦 [LogManager][${id}] 檢查日誌狀態...`);
             if (month === 1 && day === 1 && year % 10 === 0) {
                 const lastDecade = mgr._getLastDecadeString();
                 mgr.compressEra(lastDecade, instance.brain).catch(err => {
@@ -280,14 +306,7 @@ console.log(`🛡️ [Flood Guard] 系統啟動時間: ${new Date(BOOT_TIME).toL
         }
     }
 
-    // 每 6 小時巡檢一次
-    setInterval(runTieredCompression, 6 * 60 * 60 * 1000);
-
-    // 啟動時立即執行一次
-    runTieredCompression();
-
-    console.log(`✅ Multi-Golem v9.0.6 is Online. (Instances: ${GOLEMS_CONFIG.length > 0 ? GOLEMS_CONFIG.map(g => g.id).join(', ') : 'golem_A'})`);
-    if (dcClient) dcClient.login(CONFIG.DC_TOKEN);
+    console.log(`✅ Project Golem Management Dashboard is Online. (Ready to start instances)`);
 })();
 
 async function handleUnifiedMessage(ctx, forceTargetId = null) {
@@ -684,32 +703,10 @@ async function executeDrop(ctx, targetId) {
     await ctx.reply(`🗑️ [${targetId}] 提案已丟棄`);
 }
 
+// ✅ [Bug #1 修復] TG Bot 事件綁定已移入 golemFactory 內部動態處理。
+// 此靜態迴圈在啟動時 telegramBots 為空，保留為向後相容的空迴圈。
 for (const [golemId, bot] of telegramBots.entries()) {
-    bot.on('message', async (msg) => {
-        try {
-            await handleUnifiedMessage(new UniversalContext('telegram', msg, bot), golemId);
-        } catch (e) {
-            console.error(`❌ [TG ${golemId}] Message Handler Error:`, e);
-        }
-    });
-
-    bot.on('callback_query', async (query) => {
-        try {
-            await bot.answerCallbackQuery(query.id);
-        } catch (e) {
-            console.warn(`⚠️ [TG ${golemId}] Callback Answer Warning: ${e.message}`);
-        }
-
-        try {
-            await handleUnifiedCallback(
-                new UniversalContext('telegram', query, bot),
-                query.data,
-                golemId
-            );
-        } catch (e) {
-            console.error(`❌ [TG ${golemId}] Callback Handler Error:`, e);
-        }
-    });
+    // (No-op: events are now bound dynamically in golemFactory)
 }
 
 if (dcClient) {

@@ -54,11 +54,9 @@ if (GOLEM_MODE === 'SINGLE') {
             chatId: CONFIG.TG_CHAT_ID
         });
     }
-    console.log('📡 [Config] 運行模式: 單機 (GOLEM_MODE=SINGLE)');
 } else if (fs.existsSync(golemsJsonPath)) {
     try {
         GOLEMS_CONFIG = JSON.parse(fs.readFileSync(golemsJsonPath, 'utf8'));
-        console.log(`📡 [Config] 運行模式: 多機 (${GOLEMS_CONFIG.length} 實體)`);
     } catch (e) {
         console.error("❌ [Config] golems.json 格式錯誤:", e.message);
         modeToUse = "SINGLE"; // 降級
@@ -75,11 +73,9 @@ if (modeToUse === "SINGLE" || GOLEMS_CONFIG.length === 0) {
             chatId: CONFIG.TG_CHAT_ID,
             adminId: CONFIG.ADMIN_ID
         }];
-        console.log(`ℹ️ [Config] 採用 .env 單機設定 (模式: ${modeToUse})`);
     } else {
-        console.warn("⚠️ [Config] 未發現有效的 Telegram Token 且無 golems.json，機器人可能無法運作。");
+        // console.warn("⚠️ [Config] 未發現有效的 Telegram Token 且無 golems.json，機器人可能無法運作。");
     }
-    console.log('📡 [Config] 運行模式: 單機 (fallback，無 golems.json)');
 }
 
 // 確保 ID 唯一，且都有基本的 Token 屬性
@@ -92,15 +88,18 @@ GOLEMS_CONFIG = GOLEMS_CONFIG.filter(g => {
 });
 
 // 計算 mode-aware 路徑前綴
-const MODE_DIR = GOLEM_MODE === 'SINGLE' ? 'single' : 'multi';
-const LOG_BASE_DIR = path.join(process.cwd(), 'logs', MODE_DIR);
-const MEMORY_BASE_DIR = path.resolve(CONFIG.USER_DATA_DIR || './golem_memory', MODE_DIR);
-const KNOWLEDGE_BASE_DIR = path.join(process.cwd(), 'golem_memory', MODE_DIR, 'knowledge');
+// ✅ [Bug #5 修復] 改為 let，讓 reloadConfig() 能在切換模式時同步更新路徑
+let MODE_DIR = GOLEM_MODE === 'SINGLE' ? 'single' : 'multi';
+let LOG_BASE_DIR = path.join(process.cwd(), 'logs', MODE_DIR);
+let MEMORY_BASE_DIR = path.resolve(CONFIG.USER_DATA_DIR || './golem_memory', MODE_DIR);
+let KNOWLEDGE_BASE_DIR = path.join(process.cwd(), 'golem_memory', MODE_DIR, 'knowledge');
 
 // 🔄 熱重載支援函數
 const reloadConfig = () => {
-    // 重新載入 .env
-    require('dotenv').config({ override: true });
+    // 重新載入 .env 檔案取得最新值 (不依賴 cached process.env)
+    const EnvManager = require('../utils/EnvManager');
+    const freshEnv = EnvManager.readEnv();
+    Object.assign(process.env, freshEnv);
 
     // 重新整理變數到 CONFIG
     CONFIG.TG_TOKEN = cleanEnv(process.env.TELEGRAM_TOKEN);
@@ -126,28 +125,51 @@ const reloadConfig = () => {
     CONFIG.TZ = cleanEnv(process.env.TZ) || 'Asia/Taipei';
     CONFIG.INTERVENTION_LEVEL = cleanEnv(process.env.GOLEM_INTERVENTION_LEVEL) || 'CONSERVATIVE';
 
-    // 重新載入 GOLEMS_CONFIG (僅在存在 golems.json 時)
-    const golemsJsonPath = path.join(process.cwd(), 'golems.json');
-    if (fs.existsSync(golemsJsonPath)) {
-        try {
-            const newGolemsConfig = JSON.parse(fs.readFileSync(golemsJsonPath, 'utf8'));
-            // 確保 ID 唯一
-            const seenIds = new Set();
-            const validGolems = newGolemsConfig.filter(g => {
-                if (!g.id) return false;
-                if (seenIds.has(g.id)) return false;
-                seenIds.add(g.id);
-                return true;
+    // 重新載入 GOLEMS_CONFIG
+    if (freshEnv.GOLEM_MODE === 'SINGLE') {
+        // 單機模式：從 .env 重新建立 golem_A
+        GOLEMS_CONFIG.length = 0;
+        const hasToken = CONFIG.TG_TOKEN || CONFIG.DC_TOKEN;
+        if (hasToken) {
+            GOLEMS_CONFIG.push({
+                id: 'golem_A',
+                tgToken: CONFIG.TG_TOKEN,
+                tgAuthMode: CONFIG.TG_AUTH_MODE,
+                chatId: CONFIG.TG_CHAT_ID,
+                adminId: CONFIG.ADMIN_ID,
+                dcToken: CONFIG.DC_TOKEN,
+                dcAdminId: CONFIG.DISCORD_ADMIN_ID
             });
-            // In-place replace array so references hold
-            GOLEMS_CONFIG.length = 0;
-            GOLEMS_CONFIG.push(...validGolems);
-        } catch (e) {
-            console.error("❌ [Config] 熱重載 golems.json 失敗:", e.message);
+        }
+    } else {
+        // 多機模式：從 golems.json 載入
+        const golemsJsonPath = path.join(process.cwd(), 'golems.json');
+        if (fs.existsSync(golemsJsonPath)) {
+            try {
+                const newGolemsConfig = JSON.parse(fs.readFileSync(golemsJsonPath, 'utf8'));
+                const seenIds = new Set();
+                const validGolems = newGolemsConfig.filter(g => {
+                    if (!g.id) return false;
+                    if (seenIds.has(g.id)) return false;
+                    seenIds.add(g.id);
+                    return true;
+                });
+                GOLEMS_CONFIG.length = 0;
+                GOLEMS_CONFIG.push(...validGolems);
+            } catch (e) {
+                console.error("❌ [Config] 熱重載 golems.json 失敗:", e.message);
+            }
         }
     }
 
-    console.log(`🔄 [Config] 設定已熱重載完成 (Active API Keys: ${CONFIG.API_KEYS.length}, Golems: ${GOLEMS_CONFIG.length})`);
+    // ✅ [Bug #5 修復] 同步更新 mode-aware 路徑常數
+    const newModeDir = (freshEnv.GOLEM_MODE || '').trim().toUpperCase() === 'SINGLE' ? 'single' : 'multi';
+    MODE_DIR = newModeDir;
+    LOG_BASE_DIR = path.join(process.cwd(), 'logs', newModeDir);
+    MEMORY_BASE_DIR = path.resolve(process.env.USER_DATA_DIR || CONFIG.USER_DATA_DIR || './golem_memory', newModeDir);
+    KNOWLEDGE_BASE_DIR = path.join(process.cwd(), 'golem_memory', newModeDir, 'knowledge');
+
+    console.log(`🔄 [Config] 設定已熱重載完成 (Active API Keys: ${CONFIG.API_KEYS.length}, Golems: ${GOLEMS_CONFIG.length}, Mode: ${MODE_DIR})`);
 };
 
 module.exports = {

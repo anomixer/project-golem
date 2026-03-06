@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Database, Globe, ChevronLeft, ChevronRight, Terminal, BrainCircuit, BookOpen, Settings, User } from "lucide-react";
+import { LayoutDashboard, Users, Database, Globe, ChevronLeft, ChevronRight, Terminal, BrainCircuit, BookOpen, Settings, User, UserPlus } from "lucide-react";
 import { GolemProvider, useGolem } from "@/components/GolemContext";
 
 function DashboardSidebar({
@@ -15,7 +15,7 @@ function DashboardSidebar({
     setIsSidebarOpen: (v: boolean) => void
 }) {
     const pathname = usePathname();
-    const { activeGolem, setActiveGolem, golems } = useGolem();
+    const { activeGolem, setActiveGolem, golems, isSingleNode } = useGolem();
 
     const navItems = [
         { name: "戰術控制台", href: "/dashboard", icon: LayoutDashboard },
@@ -39,7 +39,9 @@ function DashboardSidebar({
                         <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400 whitespace-nowrap overflow-hidden text-ellipsis">
                             Golem v9.0
                         </h1>
-                        <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">MultiAgent War Room</p>
+                        <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">
+                            {isSingleNode ? "Bot Control Center" : "MultiAgent War Room"}
+                        </p>
                     </div>
                 )}
                 <button
@@ -66,6 +68,29 @@ function DashboardSidebar({
                     </select>
                 </div>
             )}
+
+            {/* Add New Golem Button */}
+            {!isSingleNode && (isSidebarOpen ? (
+                <div className="px-4 py-2 border-b border-gray-800">
+                    <Link
+                        href="/dashboard/agents/create"
+                        className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded-lg transition-colors border border-dashed border-indigo-800/40 hover:border-indigo-600/60"
+                    >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>新增 Golem</span>
+                    </Link>
+                </div>
+            ) : (
+                <div className="flex justify-center py-2 border-b border-gray-800">
+                    <Link
+                        href="/dashboard/agents/create"
+                        title="新增 Golem"
+                        className="w-8 h-8 flex items-center justify-center text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded-lg transition-colors"
+                    >
+                        <UserPlus className="w-4 h-4" />
+                    </Link>
+                </div>
+            ))}
 
             <nav className="flex-1 py-4 space-y-2 overflow-y-auto flex flex-col items-center">
                 {navItems.map((item) => {
@@ -132,21 +157,35 @@ function DashboardContent({
     isSidebarOpen: boolean,
     setIsSidebarOpen: (v: boolean) => void
 }) {
-    const { activeGolem, activeGolemStatus } = useGolem();
+    const { activeGolem, activeGolemStatus, isSystemConfigured, isLoadingSystem, isLoadingGolems, hasGolems } = useGolem();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
+        if (isLoadingGolems) return;
         if (activeGolemStatus === 'pending_setup' && pathname !== '/dashboard/setup') {
             router.push('/dashboard/setup');
         }
-    }, [activeGolemStatus, pathname, router]);
+    }, [activeGolemStatus, pathname, router, isLoadingGolems]);
 
-    const isSetupPage = pathname === '/dashboard/setup';
+    // 系統設定保護：若 GEMINI_API_KEYS 未設定且不在設定頁，就導向設定向導
+    useEffect(() => {
+        if (!isLoadingSystem && !isSystemConfigured && pathname !== '/dashboard/system-setup') {
+            router.push('/dashboard/system-setup');
+        }
+    }, [isLoadingSystem, isSystemConfigured, pathname, router]);
+
+    // (移除原本強制跳轉到 agents/create 的邏輯，改由 /dashboard 自己渲染迎新畫面)
+
+    const isSetupPage = ['/dashboard/system-setup', '/dashboard/agents/create', '/dashboard/setup']
+        .some(p => pathname.startsWith(p));
+
+    // 當沒有任何 Golem 時，隱藏 Sidebar，強制引導設定
+    const shouldHideSidebar = isSetupPage || (!isLoadingGolems && !hasGolems);
 
     return (
         <div className="flex h-screen bg-gray-950 text-white overflow-hidden">
-            {!isSetupPage && <DashboardSidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />}
+            {!shouldHideSidebar && <DashboardSidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />}
             {/* Main Content */}
             <main className="flex-1 overflow-auto bg-gray-950 flex flex-col h-screen relative">
                 {children}

@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { socket } from "@/lib/socket";
 import { MetricCard } from "@/components/MetricCard";
 import { LogStream } from "@/components/LogStream";
-import { Activity, Cpu, Server, Clock, RefreshCcw, PowerOff, AlertTriangle, TriangleAlert } from "lucide-react";
+import { useGolem } from "@/components/GolemContext";
+import { Activity, Cpu, Server, Clock, RefreshCcw, PowerOff, AlertTriangle, TriangleAlert, BrainCircuit, UserPlus, Zap } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -153,6 +155,7 @@ function DoneDialog({ open, onOpenChange, variant }: DoneDialogProps) {
 
 // ── 主頁面 ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+    const { hasGolems, isLoadingGolems, isSingleNode } = useGolem();
     const [metrics, setMetrics] = useState({
         uptime: "0h 0m",
         queueCount: 0,
@@ -250,6 +253,36 @@ export default function DashboardPage() {
 
     const isBusy = isLoading;
 
+    // ── 主頁面開始 ──
+    if (!isLoadingGolems && !hasGolems) {
+        return (
+            <div className="h-full flex items-center justify-center p-6 bg-gray-950">
+                <div className="max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
+                    <div className="inline-flex items-center justify-center w-24 h-24 bg-indigo-950/30 border border-indigo-900/50 rounded-[2rem] shadow-[0_0_40px_-10px_theme(colors.indigo.900)] mb-2">
+                        <BrainCircuit className="w-12 h-12 text-indigo-400" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">系統已就緒</h1>
+                        <p className="text-gray-400 text-base leading-relaxed">
+                            目前尚未部署任何 Golem 實體。<br />請建立你的第一個 AI 代理人來開始使用。
+                        </p>
+                    </div>
+                    <Link href="/dashboard/agents/create" className="inline-block w-full pt-4">
+                        <Button className="w-full h-14 bg-indigo-600 hover:bg-indigo-500 text-white text-base font-semibold border-0 shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.02] hover:shadow-indigo-500/25">
+                            <UserPlus className="w-5 h-5 mr-2" />
+                            建立第一個 Golem
+                        </Button>
+                    </Link>
+                    {isSingleNode && (
+                        <div className="pt-2 p-3 rounded-xl bg-amber-950/10 border border-amber-900/20 text-amber-200/50 text-[10px] text-left">
+                            <p>💡 偵測到<strong>單機模式</strong>：向導將協助您快速設定 <code>.env</code> 文件。</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-6 h-full flex flex-col space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -280,13 +313,17 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-800 pb-2">
                                 <span className="text-gray-400">Mode</span>
-                                <span className="text-cyan-400">Multi-Agent</span>
+                                <span className="text-cyan-400">
+                                    {isSingleNode ? "Single Node" : "Multi-Agent"}
+                                </span>
                             </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-800 pb-2">
                                 <span className="text-gray-400">Backend</span>
                                 <span className="text-green-400">Connected</span>
                             </div>
                         </div>
+
+                        {/* Inline Onboarding Card Removed (Now handled by full-page state) */}
                     </div>
 
                     {/* 操控區 */}
