@@ -63,8 +63,8 @@ export default function SystemSetupPage() {
             if (!res.ok || !data.success) {
                 throw new Error(data.error || "儲存失敗，請稍後再試");
             }
-            // 系統設定完成後，引導使用者建立第一個 Golem
-            window.location.href = "/dashboard/agents/create";
+            // 系統設定完成後，引導使用者建立第一個 Golem (若為單機模式則直接回首頁)
+            window.location.href = golemMode === "SINGLE" ? "/dashboard" : "/dashboard/agents/create";
         } catch (err: any) {
             setError(err.message);
         } finally {

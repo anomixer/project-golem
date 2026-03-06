@@ -155,7 +155,7 @@ function DoneDialog({ open, onOpenChange, variant }: DoneDialogProps) {
 
 // ── 主頁面 ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-    const { hasGolems, isLoadingGolems } = useGolem();
+    const { hasGolems, isLoadingGolems, isSingleNode } = useGolem();
     const [metrics, setMetrics] = useState({
         uptime: "0h 0m",
         queueCount: 0,
@@ -267,12 +267,19 @@ export default function DashboardPage() {
                             目前尚未部署任何 Golem 實體。<br />請建立你的第一個 AI 代理人來開始使用。
                         </p>
                     </div>
-                    <Link href="/dashboard/agents/create" className="inline-block w-full pt-4">
-                        <Button className="w-full h-14 bg-indigo-600 hover:bg-indigo-500 text-white text-base font-semibold border-0 shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.02] hover:shadow-indigo-500/25">
-                            <UserPlus className="w-5 h-5 mr-2" />
-                            建立第一個 Golem
-                        </Button>
-                    </Link>
+                    {!isSingleNode ? (
+                        <Link href="/dashboard/agents/create" className="inline-block w-full pt-4">
+                            <Button className="w-full h-14 bg-indigo-600 hover:bg-indigo-500 text-white text-base font-semibold border-0 shadow-lg shadow-indigo-900/20 transition-all hover:scale-[1.02] hover:shadow-indigo-500/25">
+                                <UserPlus className="w-5 h-5 mr-2" />
+                                建立第一個 Golem
+                            </Button>
+                        </Link>
+                    ) : (
+                        <div className="pt-4 p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 text-amber-200/70 text-sm">
+                            <p>偵測到您目前處於<strong>單機模式 (SINGLE)</strong>。</p>
+                            <p className="mt-1">請在 <code>.env</code> 中設定 <code>TELEGRAM_TOKEN</code> 即可自動啟動 Golem。</p>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -308,7 +315,9 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-800 pb-2">
                                 <span className="text-gray-400">Mode</span>
-                                <span className="text-cyan-400">Multi-Agent</span>
+                                <span className="text-cyan-400">
+                                    {isSingleNode ? "Single Node" : "Multi-Agent"}
+                                </span>
                             </div>
                             <div className="flex justify-between items-center text-sm border-b border-gray-800 pb-2">
                                 <span className="text-gray-400">Backend</span>

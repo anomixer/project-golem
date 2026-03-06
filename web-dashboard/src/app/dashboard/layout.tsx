@@ -15,7 +15,7 @@ function DashboardSidebar({
     setIsSidebarOpen: (v: boolean) => void
 }) {
     const pathname = usePathname();
-    const { activeGolem, setActiveGolem, golems } = useGolem();
+    const { activeGolem, setActiveGolem, golems, isSingleNode } = useGolem();
 
     const navItems = [
         { name: "戰術控制台", href: "/dashboard", icon: LayoutDashboard },
@@ -39,7 +39,9 @@ function DashboardSidebar({
                         <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400 whitespace-nowrap overflow-hidden text-ellipsis">
                             Golem v9.0
                         </h1>
-                        <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">MultiAgent War Room</p>
+                        <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">
+                            {isSingleNode ? "Bot Control Center" : "MultiAgent War Room"}
+                        </p>
                     </div>
                 )}
                 <button
@@ -68,7 +70,7 @@ function DashboardSidebar({
             )}
 
             {/* Add New Golem Button */}
-            {isSidebarOpen ? (
+            {!isSingleNode && (isSidebarOpen ? (
                 <div className="px-4 py-2 border-b border-gray-800">
                     <Link
                         href="/dashboard/agents/create"
@@ -88,7 +90,7 @@ function DashboardSidebar({
                         <UserPlus className="w-4 h-4" />
                     </Link>
                 </div>
-            )}
+            ))}
 
             <nav className="flex-1 py-4 space-y-2 overflow-y-auto flex flex-col items-center">
                 {navItems.map((item) => {
@@ -178,8 +180,8 @@ function DashboardContent({
     const isSetupPage = ['/dashboard/system-setup', '/dashboard/agents/create', '/dashboard/setup']
         .some(p => pathname.startsWith(p));
 
-    // 當沒有任何 Golem 時，也當作是 Setup 階段，隱藏 Sidebar
-    const shouldHideSidebar = isSetupPage || (!isLoadingGolems && !hasGolems && pathname === '/dashboard');
+    // 當沒有任何 Golem 時，隱藏 Sidebar，強制引導設定
+    const shouldHideSidebar = isSetupPage || (!isLoadingGolems && !hasGolems);
 
     return (
         <div className="flex h-screen bg-gray-950 text-white overflow-hidden">

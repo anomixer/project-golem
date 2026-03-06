@@ -124,24 +124,37 @@ const reloadConfig = () => {
     CONFIG.TZ = cleanEnv(process.env.TZ) || 'Asia/Taipei';
     CONFIG.INTERVENTION_LEVEL = cleanEnv(process.env.GOLEM_INTERVENTION_LEVEL) || 'CONSERVATIVE';
 
-    // 重新載入 GOLEMS_CONFIG (僅在存在 golems.json 時)
-    const golemsJsonPath = path.join(process.cwd(), 'golems.json');
-    if (fs.existsSync(golemsJsonPath)) {
-        try {
-            const newGolemsConfig = JSON.parse(fs.readFileSync(golemsJsonPath, 'utf8'));
-            // 確保 ID 唯一
-            const seenIds = new Set();
-            const validGolems = newGolemsConfig.filter(g => {
-                if (!g.id) return false;
-                if (seenIds.has(g.id)) return false;
-                seenIds.add(g.id);
-                return true;
+    // 重新載入 GOLEMS_CONFIG
+    if (freshEnv.GOLEM_MODE === 'SINGLE') {
+        // 單機模式：從 .env 重新建立 golem_A
+        GOLEMS_CONFIG.length = 0;
+        if (CONFIG.TG_TOKEN) {
+            GOLEMS_CONFIG.push({
+                id: 'golem_A',
+                tgToken: CONFIG.TG_TOKEN,
+                tgAuthMode: CONFIG.TG_AUTH_MODE,
+                chatId: CONFIG.TG_CHAT_ID,
+                adminId: CONFIG.ADMIN_ID
             });
-            // In-place replace array so references hold
-            GOLEMS_CONFIG.length = 0;
-            GOLEMS_CONFIG.push(...validGolems);
-        } catch (e) {
-            console.error("❌ [Config] 熱重載 golems.json 失敗:", e.message);
+        }
+    } else {
+        // 多機模式：從 golems.json 載入
+        const golemsJsonPath = path.join(process.cwd(), 'golems.json');
+        if (fs.existsSync(golemsJsonPath)) {
+            try {
+                const newGolemsConfig = JSON.parse(fs.readFileSync(golemsJsonPath, 'utf8'));
+                const seenIds = new Set();
+                const validGolems = newGolemsConfig.filter(g => {
+                    if (!g.id) return false;
+                    if (seenIds.has(g.id)) return false;
+                    seenIds.add(g.id);
+                    return true;
+                });
+                GOLEMS_CONFIG.length = 0;
+                GOLEMS_CONFIG.push(...validGolems);
+            } catch (e) {
+                console.error("❌ [Config] 熱重載 golems.json 失敗:", e.message);
+            }
         }
     }
 

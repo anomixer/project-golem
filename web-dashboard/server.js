@@ -144,7 +144,16 @@ class WebServer {
 
         // Catch-all fallback for any other /dashboard/* routes
         this.app.get(/\/dashboard\/.*/, (req, res) => {
-            res.sendFile(path.join(publicPath, 'dashboard.html'));
+            const normalizedPath = req.path.replace(/\/$/, "");
+            const htmlFileName = `${normalizedPath.replace(/^\//, '')}.html`;
+            const fullPath = path.join(publicPath, htmlFileName);
+
+            if (fs.existsSync(fullPath)) {
+                res.sendFile(fullPath);
+            } else {
+                // If the exact html file isn't found, try to resolve as a generic SPA fallback
+                res.sendFile(path.join(publicPath, 'dashboard.html'));
+            }
         });
 
 
@@ -529,10 +538,14 @@ class WebServer {
 
         this.app.get('/api/golems', (req, res) => {
             try {
-                // 1. 獲取現有的 golems.json 配置
+                const EnvManager = require('../src/utils/EnvManager');
+                const envVars = EnvManager.readEnv();
+                const isSingleNode = (envVars.GOLEM_MODE || 'MULTI').trim().toUpperCase() === 'SINGLE';
+
+                // 1. 獲取現有的 golems.json 配置 (僅在非單機模式下)
                 const golemsPath = path.resolve(process.cwd(), 'golems.json');
                 let allConfigs = [];
-                if (fs.existsSync(golemsPath)) {
+                if (!isSingleNode && fs.existsSync(golemsPath)) {
                     allConfigs = JSON.parse(fs.readFileSync(golemsPath, 'utf8'));
                 }
 
@@ -588,11 +601,14 @@ class WebServer {
                     envVars.GEMINI_API_KEYS.trim() &&
                     !envVars.GEMINI_API_KEYS.includes('你的'));
 
+                const isSingleNode = (envVars.GOLEM_MODE || 'MULTI').trim().toUpperCase() === 'SINGLE';
+
                 return res.json({
                     hasGolems: liveCount > 0 || configuredCount > 0,
                     liveCount,
                     configuredCount,
                     isSystemConfigured,
+                    isSingleNode,
                 });
             } catch (e) {
                 console.error('[WebServer] Failed to get system status:', e);
