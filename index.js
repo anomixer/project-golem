@@ -312,7 +312,26 @@ function getOrCreateGolem(golemId) {
             if (typeof instance.brain._linkDashboard === 'function') {
                 instance.brain._linkDashboard();
             }
-            instance.brain.status = 'pending_setup';
+
+            // [V9.0.9 Fix]: Verify persona.json to decide actual status
+            const pathSync = require('path');
+            const fsSync = require('fs');
+            const { GOLEM_MODE, MEMORY_BASE_DIR } = require('./src/config');
+            const isSingleMode = GOLEM_MODE === 'SINGLE';
+
+            let personaPath;
+            if (isSingleMode) {
+                personaPath = pathSync.resolve(MEMORY_BASE_DIR, 'persona.json');
+            } else {
+                personaPath = pathSync.resolve(MEMORY_BASE_DIR, golemConfig.id, 'persona.json');
+            }
+
+            if (fsSync.existsSync(personaPath)) {
+                instance.brain.status = 'running';
+            } else {
+                instance.brain.status = 'pending_setup';
+            }
+
             instance.autonomy.start();
             console.log(`✅ [Factory] Golem [${golemConfig.id}] started via Web Dashboard.`);
             return instance;

@@ -601,12 +601,18 @@ class WebServer {
                         if (context && context.brain) {
                             status = context.brain.status || 'running';
                         } else {
-                            // ✅ [Bug #4 修復] 使用 MEMORY_BASE_DIR 來正確計算 persona.json 路徑
-                            // 路徑格式應為 <USER_DATA_DIR>/persona.json (單機) 或者 <USER_DATA_DIR>/multi/persona.json
-                            const { MEMORY_BASE_DIR } = require('../src/config/index');
-                            const personaPath = path.resolve(MEMORY_BASE_DIR, 'persona.json');
+                            // ✅ [Bug #4 修復] server.js 的 CWD 是 web-dashboard/，
+                            // 必須使用 __dirname 往上一層找到真正的 golem_memory 目錄
+                            const projectRoot = path.resolve(__dirname, '..');
+                            const envVarsForPath = EnvManager.readEnv();
+                            const userDataDirFromEnv = envVarsForPath.USER_DATA_DIR;
+                            const personaPath = userDataDirFromEnv
+                                ? path.resolve(userDataDirFromEnv, 'persona.json')
+                                : path.resolve(projectRoot, 'golem_memory', 'persona.json');
                             if (!fs.existsSync(personaPath)) {
                                 status = 'pending_setup';
+                            } else {
+                                status = 'running'; // ✅ [Bug #4 修復] 加上 if exists = running
                             }
                         }
                         golemsData.push({ id, status });
