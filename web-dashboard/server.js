@@ -112,6 +112,21 @@ class WebServer {
             }, 1000);
         });
 
+
+        // --- Health Check Endpoint ---
+        this.app.get('/api/health', (req, res) => {
+            const pkg = (() => { try { return require('../package.json'); } catch { return { version: 'unknown' }; } })();
+            res.json({
+                status: 'ok',
+                uptime: process.uptime(),
+                memory: process.memoryUsage(),
+                brain: { connected: !!(this.brain && this.brain.page) },
+                skills: this.brain?.skillManager?.getLoadedSkills?.()?.length || 0,
+                version: pkg.version,
+                timestamp: new Date().toISOString()
+            });
+        });
+
         // Socket.io connection handler
         this.io.on('connection', (socket) => {
             // Send initial state upon connection
