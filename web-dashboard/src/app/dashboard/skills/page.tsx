@@ -198,6 +198,41 @@ function SkillEditorDialog({
     );
 }
 
+// ── Install Success Dialog ──────────────────────────────────────────────────
+function InstallSuccessDialog({
+    open, onOpenChange
+}: {
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-sm sm:max-w-[425px]">
+                <DialogHeader className="flex flex-col items-center gap-2 pt-2">
+                    <div className="w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex flex-col items-center justify-center">
+                        <CheckCircle2 className="w-8 h-8 text-cyan-400" />
+                    </div>
+                    <DialogTitle className="text-white text-lg mt-2 font-bold">技能已安裝成功</DialogTitle>
+                    <DialogDescription className="text-gray-400 text-sm text-center leading-relaxed mt-2" asChild>
+                        <div>
+                            新技能已經加入「已載入模組」囉！<br />
+                            請記得點擊畫面右上角的 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 mx-1 font-medium"><Zap className="w-3 h-3" />注入技能書</span> 以套用新技能。
+                        </div>
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-center mt-4">
+                    <Button
+                        className="bg-cyan-700 hover:bg-cyan-600 text-white w-full focus:ring-2 focus:ring-cyan-500/50 outline-none"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        我知道了
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 const MARKET_CATEGORIES = [
     { id: 'all', name: '全部類別', name_en: 'All Categories' },
     { id: 'ai-and-llms', name: '人工智慧與模型', name_en: 'AI & LLMs' },
@@ -261,6 +296,9 @@ export default function SkillsPage() {
     const [showEditor, setShowEditor] = useState(false);
     const [editorMode, setEditorMode] = useState<"create" | "edit">("create");
     const [editTarget, setEditTarget] = useState<{ id: string, content: string }>({ id: "", content: "" });
+
+    // Success dialog
+    const [showInstallSuccess, setShowInstallSuccess] = useState(false);
 
     const loadSkills = useCallback(() => {
         fetch("/api/skills")
@@ -360,6 +398,7 @@ export default function SkillsPage() {
             if (data.success) {
                 setHasUnsyncedChanges(true);
                 loadSkills();
+                setShowInstallSuccess(true);
             }
         } catch (err) {
             console.error("Install failed:", err);
@@ -803,6 +842,10 @@ export default function SkillsPage() {
                     setHasUnsyncedChanges(true);
                     loadSkills();
                 }}
+            />
+            <InstallSuccessDialog
+                open={showInstallSuccess}
+                onOpenChange={setShowInstallSuccess}
             />
         </>
     );

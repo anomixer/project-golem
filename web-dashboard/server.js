@@ -531,26 +531,46 @@ class WebServer {
                 }
 
                 const https = require('https');
-                const content = await new Promise((resolve, reject) => {
-                    https.get(rawUrl, (response) => {
-                        if (response.statusCode === 404 && rawUrl.endsWith('SKILL.md')) {
-                            const lowerUrl = rawUrl.replace('SKILL.md', 'skill.md');
-                            https.get(lowerUrl, (resLower) => {
-                                if (resLower.statusCode !== 200) return reject(new Error('Skill markdown not found'));
-                                let data = '';
-                                resLower.on('data', chunk => data += chunk);
-                                resLower.on('end', () => resolve(data));
-                            }).on('error', reject);
-                            return;
+
+                async function fetchWithFallback(url, id) {
+                    const tryUrls = [
+                        url, // Original
+                        url.replace(/\/SKILL\.md$/i, `/${id}/SKILL.md`), // Subdir + SKILL.md
+                        url.replace(/\/SKILL\.md$/i, `/${id}/skill.md`), // Subdir + skill.md
+                        url.endsWith('SKILL.md') ? url.replace('SKILL.md', 'skill.md') : url + '/skill.md' // Root skill.md
+                    ];
+
+                    // Remove duplicates
+                    const uniqueUrls = [...new Set(tryUrls)];
+
+                    for (const targetUrl of uniqueUrls) {
+                        try {
+                            const data = await new Promise((resolve, reject) => {
+                                const options = {
+                                    headers: { 'User-Agent': 'Golem-Dashboard-Installer' }
+                                };
+                                https.get(targetUrl, options, (response) => {
+                                    if (response.statusCode === 200) {
+                                        let body = '';
+                                        response.on('data', chunk => body += chunk);
+                                        response.on('end', () => resolve(body));
+                                    } else {
+                                        resolve(null);
+                                    }
+                                }).on('error', (e) => resolve(null));
+                            });
+                            if (data) return data;
+                        } catch (e) {
+                            continue;
                         }
-                        if (response.statusCode !== 200) {
-                            return reject(new Error(`Failed to fetch markdown, status: ${response.statusCode}`));
-                        }
-                        let data = '';
-                        response.on('data', chunk => data += chunk);
-                        response.on('end', () => resolve(data));
-                    }).on('error', reject);
-                });
+                    }
+                    return null;
+                }
+
+                const content = await fetchWithFallback(rawUrl, id);
+                if (!content) {
+                    return res.status(404).json({ error: 'Skill markdown not found even after trying subdirectories' });
+                }
 
                 const safeId = id.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
                 const libPath = path.join(process.cwd(), 'src', 'skills', 'lib');
