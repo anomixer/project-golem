@@ -44,6 +44,11 @@ class WebServer {
     constructor(dashboard) {
         this.dashboard = dashboard; // Reference to main dashboard if needed for initial state
         this.app = express();
+        const cors = require('cors');
+        this.app.use(cors({
+            origin: ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
+            methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        }));
         this.app.use(express.json()); // Enable JSON body parsing
         this.server = http.createServer(this.app);
 
