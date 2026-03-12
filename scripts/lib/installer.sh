@@ -40,7 +40,7 @@ step_check_env() {
     if [ ! -f "$DOT_ENV_PATH" ]; then
         if [ -f "$SCRIPT_DIR/.env.example" ]; then
             cp "$SCRIPT_DIR/.env.example" "$DOT_ENV_PATH"
-            echo -e "    ${YELLOW}ℹ${NC}  已從範本 ${BOLD}.env.example${NC} 建立 ${BOLD}.env${NC}"
+            echo -e "    ${GREEN}✔${NC}  已從範本 ${BOLD}.env.example${NC} 建立 ${BOLD}.env${NC}"
             log "Created .env from example"
         else
             echo -e "    ${YELLOW}ℹ${NC}  找不到 .env.example，將建立基本 .env 檔案"
@@ -107,14 +107,17 @@ step_install_core() {
     fi
 
     if ! run_quiet_step "npm install 安裝中" npm install $npm_flags; then
-        echo -e "  ${YELLOW}💡 可能原因:${NC}"
-        echo -e "     • 網路連線問題 → 請確認網路是否正常"
-        echo -e "     • Node.js 版本不符 → 需要 v20+ (目前: $(node -v 2>/dev/null || echo N/A))"
-        echo -e "     • 權限問題 → 嘗試 ${BOLD}sudo npm install${NC}"
+        echo -e "  ${RED}${BOLD}❌ 依賴安裝失敗${NC}"
+        echo -e "  ${YELLOW}💡 建議解決方法:${NC}"
+        echo -e "     • 🌐 ${BOLD}檢查網路${NC}：如果是 npm 連線問題，請確認是否需要設定 Proxy。"
+        echo -e "     • 🔄 ${BOLD}Node.js 版本${NC}：確保版本 >= v20 (目前: $(node -v 2>/dev/null || echo N/A))。"
+        echo -e "     • 🛡️  ${BOLD}權限問題${NC}：如果是 EACCES 錯誤，嘗試使用 ${BOLD}sudo npm install${NC}。"
         if [[ "$arch" == "arm64" ]]; then
-            echo -e "     • ${CYAN}ARM64 相容性${NC} → 嘗試安裝系統級編譯工具 (build-essential/python3)"
+            echo -e "     • 🍎 ${CYAN}ARM64/M1/M2${NC}：若編譯失敗，請安裝系統編譯工具：${DIM}xcode-select --install${NC}"
         fi
-        echo -e "  ${DIM}  詳細日誌: $LOG_FILE${NC}"
+        echo ""
+        echo -e "  ${CYAN}🏥 您可以執行實用的診斷工具：${BOLD}./setup.sh --doctor${NC}"
+        echo -e "  ${DIM}詳細錯誤記錄於: $LOG_FILE${NC}"
         log "FATAL: npm install failed"
         exit 1
     fi
@@ -131,9 +134,16 @@ step_install_dashboard() {
     echo -e "  🌐 設定 Web Dashboard..."
     log "Setting up dashboard"
     [ -f "$DOT_ENV_PATH" ] && source "$DOT_ENV_PATH" 2>/dev/null
-    if [ "$ENABLE_WEB_DASHBOARD" != "true" ]; then
+    # 若變數未設定但目錄存在，預設為開啟
+    if [ -z "${ENABLE_WEB_DASHBOARD:-}" ] && [ -d "$SCRIPT_DIR/web-dashboard" ]; then
+        ENABLE_WEB_DASHBOARD="true"
+        update_env "ENABLE_WEB_DASHBOARD" "true"
+    fi
+
+    if [ "${ENABLE_WEB_DASHBOARD:-false}" != "true" ]; then
         echo -e "    ${DIM}⏩ Dashboard 已停用，跳過安裝${NC}\n"; return
     fi
+
     if [ ! -d "$SCRIPT_DIR/web-dashboard" ]; then
         ui_warn "找不到 web-dashboard 目錄，自動停用 Dashboard"
         update_env "ENABLE_WEB_DASHBOARD" "false"
@@ -210,6 +220,12 @@ run_clean_init() {
     # Logs directory
     rm -rf "$SCRIPT_DIR/logs"
     echo -e "    ${GREEN}✔${NC} 刪除系統日誌 (logs)"
+
+    # .env file
+    if [ -f "$DOT_ENV_PATH" ]; then
+        rm -f "$DOT_ENV_PATH"
+        echo -e "    ${GREEN}✔${NC} 刪除環境設定檔 (.env)"
+    fi
     
     echo -e "  ${GREEN}✅ 清理完成！請重新啟動或進行手動配置。${NC}"
     sleep 2
@@ -240,9 +256,10 @@ run_full_install() {
     step_check_env
 
     # Step 3: Configure .env (Gemini Keys + System Options)
-    progress_bar 3 $total_steps "配置環境變數"
-    echo ""
-    config_wizard
+    # 註：如果使用者已提供 .env.example，則直接使用，不強制進入配置精靈
+    # progress_bar 3 $total_steps "配置環境變數"
+    # echo ""
+    # config_wizard
 
     # Step 4: Install core deps
     progress_bar 4 $total_steps "安裝核心依賴"
@@ -272,6 +289,11 @@ step_final() {
     box_top
     box_line_colored "  ${GREEN}${BOLD}🎉 部署成功！${NC}"
     box_line_colored "  ${GREEN}${BOLD}   Golem v${GOLEM_VERSION} (Titan Chronos) 已就緒${NC}"
+    box_sep
+    box_line_colored "  ${BOLD}下一步操作：${NC}                                          "
+    box_line_colored "  1. 🌐 開啟瀏覽器存取 ${BOLD}Dashboard${NC} 完成 API 設定 "
+    box_line_colored "  2. 📝 在 Dashboard 中填入您的 ${BOLD}Gemini API Key${NC}"
+    box_line_colored "  3. 🤖 新增您第一個傀儡實體並填入 ${BOLD}Bot Token${NC}"
     box_sep
     [ -n "$elapsed" ] && box_line_colored "  ⏱️  安裝耗時: ${CYAN}${elapsed}${NC}"
     box_line_colored "  📋 安裝日誌: ${DIM}${LOG_FILE}${NC}"

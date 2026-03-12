@@ -11,11 +11,11 @@ fi
 
 chmod +x ./setup.sh
 
-# 檢查是否為初次執行
 if [ ! -f ".env" ] || [ ! -d "node_modules" ]; then
-    echo "✨ 偵測到環境未完全建立，即將進入自動安裝..."
+    echo "✨ 偵測到環境未完全建立，即將啟動 Project Golem 部署助手..."
     ./setup.sh
 else
-    # 已經安裝過，直接略過選單啟動重點系統
+    # 已經安裝過，直接略過選單啟動系統
+    echo "🚀 正在快速啟動 Project Golem..."
     ./setup.sh --start
 fi

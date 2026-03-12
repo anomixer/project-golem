@@ -39,6 +39,8 @@
     "puppeteer": "22.6.0",
     "puppeteer-extra": "3.3.6",
     "puppeteer-extra-plugin-stealth": "2.11.2",
+    "express": "5.2.1",
+    "socket.io": "4.8.3",
     "socket.io-client": "4.8.3",
     "sqlite3": "^5.1.7",
     "uuid": "9.0.1"

@@ -1,4 +1,4 @@
-﻿# =======================================================
+# =======================================================
 # Project Golem v9.0 (Titan Chronos) - 自動化安裝精靈
 # PowerShell 版本 - 完整支援 Unicode / 繁體中文
 # =======================================================
@@ -295,8 +295,18 @@ function Launch-System {
 function Run-FullInstall {
     if (-not (Step-CheckFiles)) { return }
     if (-not (Step-CheckNode)) { return }
-    $null = Step-CheckEnv
-    Start-ConfigWizard
+    
+    # 📝 核心優化：完整安裝應先清理舊配置，確保從 .env.example 重新開始
+    if (Test-Path '.env') {
+        Remove-Item '.env' -Force
+        Write-Host '   [OK] 已清理舊的環境設定檔 (.env)。' -ForegroundColor Green
+    }
+
+    if (-not (Step-CheckEnv)) { return }
+    
+    # 註：如果使用者已透過 .env.example 預設好參數，則不強制進入互動式精靈
+    # Start-ConfigWizard
+    
     if (-not (Step-InstallCore)) { return }
     Step-InstallDashboard
     Step-Final

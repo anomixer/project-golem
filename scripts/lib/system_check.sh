@@ -86,9 +86,12 @@ check_status() {
         STATUS_GOLEMS="${YELLOW}⚠️ 未配置${NC}"
     fi
 
-    # Web Dashboard
+    # Web Dashboard [V9.1.5 Updated]
     IsDashEnabled=false
-    if grep -q "ENABLE_WEB_DASHBOARD=true" "$DOT_ENV_PATH" 2>/dev/null; then
+    local dash_env; dash_env=$(grep "^ENABLE_WEB_DASHBOARD=" "$DOT_ENV_PATH" 2>/dev/null | cut -d'=' -f2)
+    
+    # 如果變數設為 true，或者變數不存在但目錄存在，則視為啟用
+    if [ "$dash_env" = "true" ] || { [ -z "$dash_env" ] && [ -d "$SCRIPT_DIR/web-dashboard" ]; }; then
         STATUS_DASH="${GREEN}✅ 啟用${NC}"
         IsDashEnabled=true
     else
@@ -336,9 +339,21 @@ run_health_check() {
 
     box_sep
     if [ "$all_pass" = true ]; then
-        box_line_colored "  ${GREEN}${BOLD}✅ 系統就緒，可以啟動！${NC}"
+        box_line_colored "  ${GREEN}${BOLD}✅ 系統就緒，可以啟動！${NC}                          "
+        box_line_colored "  ${DIM}指令: ${BOLD}./setup.sh --start${NC}                        "
     else
-        box_line_colored "  ${RED}${BOLD}⚠️  部分檢查未通過，建議先修復再啟動${NC}"
+        box_line_colored "  ${RED}${BOLD}⚠️  部分檢查未通過，請參考下方快速修復建議${NC}        "
+        box_sep
+        box_line_colored "  ${YELLOW}💡 快速修復 (Quick Fix):${NC}                             "
+        [ "$NODE_OK" = false ] && box_line_colored "  • 安裝 Node.js: ${CYAN}./setup.sh${NC} (並選擇安裝項)       "
+        [ "$ENV_OK" = false ]  && box_line_colored "  • 建立環境檔:   ${CYAN}cp .env.example .env${NC}         "
+        if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
+            box_line_colored "  • 安裝套件:     ${CYAN}npm install${NC}                      "
+        fi
+        if [ "$IsDashEnabled" = true ] && [ ! -d "$SCRIPT_DIR/web-dashboard/out" ]; then
+            box_line_colored "  • 建置控制台:   ${CYAN}cd web-dashboard && npm run build${NC} "
+        fi
+        box_line_colored "  • 執行深度診斷: ${CYAN}./setup.sh --doctor${NC}               "
     fi
     box_bottom
     echo ""

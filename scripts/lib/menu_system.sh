@@ -142,10 +142,19 @@ launch_system() {
     run_health_check
 
     if [ "$IsDashEnabled" = true ]; then
-        if [ ! -d "$SCRIPT_DIR/web-dashboard/out" ] && [ ! -d "$SCRIPT_DIR/web-dashboard/node_modules" ]; then
-            echo -e "  ${YELLOW}⚠️  Dashboard 已啟用但尚未建置${NC}"
-            echo -e "  ${DIM}   請先執行 [4] 重建 Web Dashboard${NC}"
-            echo ""
+        if [ ! -d "$SCRIPT_DIR/web-dashboard/out" ]; then
+            echo -e "  ${YELLOW}⚠️  偵測到 Dashboard 尚未建置 (缺少 out 目錄)${NC}"
+            if confirm_action "是否現在立即自動建置 Dashboard？"; then
+                step_install_dashboard
+                # 重新檢查建置結果
+                if [ ! -d "$SCRIPT_DIR/web-dashboard/out" ]; then
+                    echo -e "  ${RED}❌ 建置失敗，系統可能無法正常顯示網頁介面。${NC}"
+                    sleep 2
+                fi
+            else
+                echo -e "  ${DIM}   提示: 您可以稍後執行完整安裝流程進行建置。${NC}"
+                echo ""
+            fi
         else
             echo -e "  ${GREEN}🌐 Web Dashboard → http://localhost:${DASHBOARD_PORT:-3000}${NC}"
         fi

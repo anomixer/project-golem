@@ -121,12 +121,30 @@ case "${1:-}" in
         exit 0
         ;;
     *)
+        # 🔗 核心優化：優化首次執行體驗
         if [ ! -f "$DOT_ENV_PATH" ] && [ ! -d "$SCRIPT_DIR/node_modules" ]; then
+            clear; echo ""
+            box_top
+            box_line_colored "  ${BOLD}${CYAN}👋 歡迎使用 Project Golem 部署助手${NC}                "
+            box_sep
+            box_line_colored "  ${DIM}這是您第一次執行本系統。我們將引導您完成以下步驟：${NC}"
+            box_line_colored ""
+            box_line_colored "  ${GREEN}1.${NC} 🏥 檢查系統環境 (Node.js/npm) "
+            box_line_colored "  ${GREEN}2.${NC} 📄 初始化環境設定檔 (.env)"
+            box_line_colored "  ${GREEN}3.${NC} 📦 安裝核心依賴與 Web Dashboard"
+            box_line_colored "  ${GREEN}4.${NC} 🚀 啟動系統戰術介面"
+            box_line_colored ""
+            box_line_colored "  ${DIM}此過程大約需要 2-5 分鐘，視您的網路速度而定。${NC}"
+            box_bottom
             echo ""
-            echo -e "${CYAN}✨ 偵測到首次執行，即將開始自動一鍵安裝...${NC}"
-            echo -e "${DIM}(5 秒後自動繼續... 按 Ctrl+C 取消)${NC}"
-            sleep 5
-            run_full_install
+            
+            if confirm_action "準備好開始一鍵安裝了嗎？"; then
+                run_full_install
+            else
+                echo -e "  ${DIM}已取消自動安裝。您可以稍後在選單中執行「完整安裝」。${NC}"
+                sleep 2
+                show_menu
+            fi
         else
             show_menu
         fi
