@@ -34,15 +34,15 @@ const SystemHealthDashboard = ({ systemStatus }: { systemStatus: SystemStatus | 
     const { runtime, health, system } = systemStatus;
 
     const StatusItem = ({ label, status, icon: Icon }: { label: string, status: boolean, icon: any }) => (
-        <div className="flex items-center justify-between p-2 rounded-lg bg-gray-900/40 border border-gray-800/40">
+        <div className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 border border-border/40">
             <div className="flex items-center gap-2">
-                <Icon className="w-4 h-4 text-gray-400" />
-                <span className="text-xs text-gray-300">{label}</span>
+                <Icon className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-foreground/80">{label}</span>
             </div>
             {status ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
             ) : (
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500" />
             )}
         </div>
     );
@@ -50,40 +50,40 @@ const SystemHealthDashboard = ({ systemStatus }: { systemStatus: SystemStatus | 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-4 duration-500 mb-8">
             {/* 1. Runtime Info */}
-            <div className="bg-gray-900/30 border border-gray-800 hover:border-gray-700/50 transition-colors rounded-xl p-5 shadow-sm">
+            <div className="bg-card border border-border hover:border-primary/30 transition-colors rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                    <Cpu className="w-5 h-5 text-cyan-400" />
-                    <h3 className="text-sm font-semibold text-white">運作環境 (Runtime)</h3>
+                    <Cpu className="w-5 h-5 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">運作環境 (Runtime)</h3>
                 </div>
                 <div className="space-y-3">
                     <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">OS</span>
-                        <span className="text-indigo-400 font-medium">{(systemStatus as any)?.runtime?.osName || 'Unknown'}</span>
+                        <span className="text-muted-foreground">OS</span>
+                        <span className="text-primary font-medium">{(systemStatus as any)?.runtime?.osName || 'Unknown'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Node.js</span>
-                        <span className="text-gray-300 font-mono">{runtime?.node || 'Unknown'}</span>
+                        <span className="text-muted-foreground">Node.js</span>
+                        <span className="text-foreground font-mono">{runtime?.node || 'Unknown'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">npm</span>
-                        <span className="text-gray-300 font-mono">{runtime?.npm || 'Unknown'}</span>
+                        <span className="text-muted-foreground">npm</span>
+                        <span className="text-foreground font-mono">{runtime?.npm || 'Unknown'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Platform</span>
-                        <span className="text-gray-300 capitalize">{runtime?.platform} ({runtime?.arch})</span>
+                        <span className="text-muted-foreground">Platform</span>
+                        <span className="text-foreground capitalize">{runtime?.platform} ({runtime?.arch})</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Uptime</span>
-                        <span className="text-gray-300">{Math.floor((runtime?.uptime || 0) / 3600)}h {Math.floor(((runtime?.uptime || 0) % 3600) / 60)}m</span>
+                        <span className="text-muted-foreground">Uptime</span>
+                        <span className="text-foreground">{Math.floor((runtime?.uptime || 0) / 3600)}h {Math.floor(((runtime?.uptime || 0) % 3600) / 60)}m</span>
                     </div>
                 </div>
             </div>
 
             {/* 2. System Health */}
-            <div className="bg-gray-900/30 border border-gray-800 hover:border-gray-700/50 transition-colors rounded-xl p-5 shadow-sm">
+            <div className="bg-card border border-border hover:border-primary/30 transition-colors rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                    <Activity className="w-5 h-5 text-emerald-400" />
-                    <h3 className="text-sm font-semibold text-white">健康檢查 (Health)</h3>
+                    <Activity className="w-5 h-5 text-green-600 dark:text-emerald-400" />
+                    <h3 className="text-sm font-semibold text-foreground">健康檢查 (Health)</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                     <StatusItem label="API Keys" status={!!health?.keys} icon={Activity} />
@@ -94,18 +94,18 @@ const SystemHealthDashboard = ({ systemStatus }: { systemStatus: SystemStatus | 
             </div>
 
             {/* 3. System Resources */}
-            <div className="bg-gray-900/30 border border-gray-800 hover:border-gray-700/50 transition-colors rounded-xl p-5 shadow-sm">
+            <div className="bg-card border border-border hover:border-primary/30 transition-colors rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                    <Server className="w-5 h-5 text-indigo-400" />
-                    <h3 className="text-sm font-semibold text-white">系統資源 (Resources)</h3>
+                    <Server className="w-5 h-5 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">系統資源 (Resources)</h3>
                 </div>
                 <div className="space-y-4">
                     <div>
-                        <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                        <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
                             <span>記憶體 (Memory)</span>
                             <span>{system?.freeMem} / {system?.totalMem}</span>
                         </div>
-                        <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-indigo-500 transition-all duration-1000"
                                 style={{ width: `${100 - (parseInt(system?.freeMem || "0") / parseInt(system?.totalMem || "1")) * 100}%` }}
@@ -113,11 +113,11 @@ const SystemHealthDashboard = ({ systemStatus }: { systemStatus: SystemStatus | 
                         </div>
                     </div>
                     <div className="flex justify-between text-xs pt-1">
-                        <div className="flex items-center gap-2 text-gray-500">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                             <HardDrive className="w-4 h-4" />
                             磁碟可用空間
                         </div>
-                        <span className="text-emerald-400 font-bold">{system?.diskAvail || 'N/A'}</span>
+                        <span className="text-green-600 dark:text-emerald-400 font-bold">{system?.diskAvail || 'N/A'}</span>
                     </div>
                 </div>
             </div>
@@ -140,16 +140,16 @@ const SettingField = ({
 
     return (
         <div className="flex flex-col mb-4">
-            <label className="text-sm font-medium text-gray-300 mb-1 flex items-center justify-between gap-1 overflow-hidden">
+            <label className="text-sm font-medium text-muted-foreground mb-1 flex items-center justify-between gap-1 overflow-hidden">
                 <span className="truncate mr-1" title={label}>{label}</span>
                 <div className="flex items-center gap-1.5 shrink-0">
                     {isReadOnly && (
-                        <span className="text-[10px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700 flex items-center gap-1 whitespace-nowrap">
+                        <span className="text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded border border-border flex items-center gap-1 whitespace-nowrap">
                             <Lock className="w-3 h-3" /> 唯讀
                         </span>
                     )}
                     {!isReadOnly && (
-                        <span className="text-[10px] bg-orange-900/40 text-orange-400 px-1.5 py-0.5 rounded border border-orange-800/50 whitespace-nowrap">需重啟</span>
+                        <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-orange-400 px-1.5 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">需重啟</span>
                     )}
                 </div>
             </label>
@@ -164,21 +164,21 @@ const SettingField = ({
                     }}
                     placeholder={placeholder}
                     disabled={isReadOnly}
-                    className={`w-full bg-gray-900/50 border border-gray-700/50 focus:border-cyan-500 rounded-lg px-3 py-2 text-sm text-gray-100 font-mono transition-colors ${isReadOnly ? "opacity-70 cursor-not-allowed bg-gray-900/80" : ""} ${isSecret ? "pr-10" : ""}`}
+                    className={`w-full bg-secondary/30 border border-border focus:border-primary rounded-lg px-3 py-2 text-sm text-foreground font-mono transition-colors ${isReadOnly ? "opacity-70 cursor-not-allowed bg-muted" : ""} ${isSecret ? "pr-10" : ""}`}
                     spellCheck={false}
                 />
                 {isSecret && (
                     <button
                         type="button"
                         onClick={() => setIsVisible(!isVisible)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors p-1"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                         title={isVisible ? "隱藏內容" : "顯示內容"}
                     >
                         {isVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                 )}
             </div>
-            {desc && <p className="text-xs text-gray-500 mt-1">{desc}</p>}
+            {desc && <p className="text-xs text-muted-foreground mt-1">{desc}</p>}
         </div>
     );
 };
@@ -303,21 +303,21 @@ const SystemUpdateSection = () => {
     if (!updateInfo) return null;
 
     return (
-        <div className="bg-gray-900/30 border border-indigo-900/50 hover:border-indigo-700/50 transition-colors rounded-xl p-5 shadow-sm mb-6 animate-in fade-in">
+        <div className="bg-card border border-primary/20 hover:border-primary/40 transition-colors rounded-xl p-5 shadow-sm mb-6 animate-in fade-in">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                        <DownloadCloud className="w-5 h-5 text-indigo-400" />
+                    <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                        <DownloadCloud className="w-5 h-5 text-primary" />
                         系統升級與版本控制 (System Update)
                     </h2>
-                    <p className="text-sm text-gray-400 mt-1">
-                        當前版本: <span className="font-mono text-cyan-400 px-1">{updateInfo.currentVersion}</span>
-                        | 安裝模式: <span className="uppercase text-xs bg-gray-800 px-1.5 py-0.5 rounded ml-1 tracking-wider">{updateInfo.installMode}</span>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        當前版本: <span className="font-mono text-primary px-1">{updateInfo.currentVersion}</span>
+                        | 安裝模式: <span className="uppercase text-[10px] bg-secondary px-1.5 py-0.5 rounded ml-1 tracking-wider text-muted-foreground">{updateInfo.installMode}</span>
                     </p>
                 </div>
                 <button
                     onClick={() => { setShowModal(true); setUpdateDone(false); setIsUpdating(false); setStatusText(""); }}
-                    className="px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 rounded-lg text-sm transition-all"
+                    className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-lg text-sm transition-all font-medium"
                 >
                     檢查並更新系統 (Update)
                 </button>
@@ -613,10 +613,10 @@ export default function SettingsPage() {
             <div className="max-w-6xl mx-auto space-y-6">
 
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
                     <div>
                         <h1 className="text-2xl font-bold flex items-center gap-2">
-                            <Settings className="w-6 h-6 text-cyan-400" />
+                            <Settings className="w-6 h-6 text-primary" />
                             系統配置總表 (System Settings)
                         </h1>
                         <p className="text-sm text-gray-400 mt-1">
@@ -667,8 +667,8 @@ export default function SettingsPage() {
                     {/* 左側：AI 大腦與控制權限 */}
                     <div className="space-y-6">
                         {/* Section: Gemini Brain */}
-                        <div className="bg-gray-900/30 border border-gray-800 rounded-xl p-5 shadow-sm">
-                            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                                 🧠 Golem Brain (大腦設定)
                             </h2>
                             <SettingField
@@ -683,8 +683,8 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Section: Telegram Config */}
-                        <div className="bg-gray-900/30 border border-gray-800 hover:border-indigo-900/50 transition-colors rounded-xl p-5 shadow-sm">
-                            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <div className="bg-card border border-border hover:border-primary/20 transition-colors rounded-xl p-5 shadow-sm">
+                            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                                 ✈️ Telegram 設定 (單機全域)
                             </h2>
                             <SettingField
@@ -725,8 +725,8 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Section: Discord Config */}
-                        <div className="bg-gray-900/30 border border-gray-800 hover:border-purple-900/50 transition-colors rounded-xl p-5 shadow-sm">
-                            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <div className="bg-card border border-border hover:border-primary/20 transition-colors rounded-xl p-5 shadow-sm">
+                            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                                 👾 Discord 設定
                             </h2>
                             <SettingField
@@ -752,8 +752,8 @@ export default function SettingsPage() {
                     {/* 右側：系統進階與社交 */}
                     <div className="space-y-6">
                         {/* Section: Moltbook / Social */}
-                        <div className="bg-gray-900/30 border border-gray-800 hover:border-rose-900/30 transition-colors rounded-xl p-5 shadow-sm">
-                            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <div className="bg-card border border-border hover:border-rose-900/20 transition-colors rounded-xl p-5 shadow-sm">
+                            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                                 🦞 Moltbook 社交網絡
                             </h2>
                             <SettingField
@@ -776,8 +776,8 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Section: System Advanced */}
-                        <div className="bg-gray-900/30 border border-gray-800 rounded-xl p-5 shadow-sm">
-                            <h2 className="text-lg font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                                 ⚙️ 系統進階設定
                             </h2>
                             <SettingField
