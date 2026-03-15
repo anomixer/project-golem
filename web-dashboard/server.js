@@ -92,6 +92,7 @@ class WebServer {
         this.golemFactory = null; // Injected from index.js for dynamic Golem creation
 
         this.init();
+        this.isBooting = true;
         this.logBuffer = []; // Store last 200 logs
         this.chatHistory = new Map(); // Store chat history per golem
     }
@@ -136,11 +137,14 @@ class WebServer {
                     }
                 } catch (e) {
                     console.error(`❌ [WebServer] Failed to auto-start Golem:`, e);
+                } finally {
+                    this.isBooting = false;
                 }
             } else {
                 console.log(`⏸️ [WebServer] Golem skipped auto-start (Missing persona.json).`);
+                this.isBooting = false;
             }
-        }, 2000);
+        }, 500);
     }
 
     setContext(golemId, brain, memory, autonomy) {
@@ -1147,6 +1151,7 @@ class WebServer {
                     liveCount,
                     configuredCount,
                     isSystemConfigured,
+                    isBooting: this.isBooting,
                     runtime,
                     health,
                     system

@@ -276,9 +276,14 @@ const SystemUpdateSection = () => {
                 try {
                     const checkRes = await fetch("/api/system/status");
                     if (checkRes.ok) {
-                        clearInterval(pollInterval);
-                        setStatusText("重新啟動完成！頁面即將重新載入...");
-                        setTimeout(() => { window.location.reload(); }, 1000);
+                        const data = await checkRes.json();
+                        if (!data.isBooting) {
+                            clearInterval(pollInterval);
+                            setStatusText("重新啟動完成！頁面即將重新載入...");
+                            setTimeout(() => { window.location.reload(); }, 1500);
+                        } else {
+                            setStatusText("系統正在初始化中...");
+                        }
                     }
                 } catch (err) {
                     // Server is offline
