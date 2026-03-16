@@ -27,9 +27,11 @@
 ## 📖 目錄 (Table of Contents)
 - [✨ 這是什麼？](#-這是什麼)
 - [🌟 核心亮點](#-核心亮點)
-- [🏗️ 系統架構](#️-系統架構)
-- [🎨 實戰與應用場景 (Showcase)](#-實戰與應用場景-showcase)
+- [📸 使用案例與介面展示](#-使用案例與介面展示)
 - [⚡ 快速開始](#-快速開始)
+- [🎮 指令速查](#-指令速查-command-reference)
+- [🏗️ 系統架構](#️-系統架構)
+- [🧠 金字塔式長期記憶](#-金字塔式長期記憶-pyramidal-long-term-memory)
 - [📖 完整文件與指南](#-完整文件與指南)
 
 ---
@@ -129,9 +131,20 @@ chmod +x setup.sh
 # 一鍵自動安裝依賴與解決 Port 衝突
 ./setup.sh --magic
 
-# 平時直接啟動
+# 直接啟動
 ./setup.sh --start
 ```
+
+---
+
+## 🎮 指令速查 (Command Reference)
+
+| 指令 | 功能 |
+|------|------|
+| `/help` | 查看完整指令說明 |
+| `/new` | 重置對話並載入相關記憶 |
+| `/learn <功能>` | 讓 AI 自動學習並生成新技能 |
+| `/skills` | 列出所有已安裝的技能 |
 
 ---
 
@@ -144,7 +157,7 @@ chmod +x setup.sh
 
 ## 🏗️ 系統架構
 
-Golem 採用 **Browser-in-the-Loop** 混合架構：
+Golem 採用 **Browser-in-the-Loop** 混合架構，賦予其超越標準 API 限制的靈活性。
 
 ```mermaid
 graph TD
@@ -155,10 +168,32 @@ graph TD
     
     subgraph Reflex ["神經分流 Reflex"]
         NeuroShunter -->|"REPLY"| User
-        NeuroShunter -->|"MEMORY"| LongTermMemory
-        NeuroShunter -->|"ACTION"| SkillManager
+        NeuroShunter -->|"MEMORY"| LongTermMemory["🧠 金字塔記憶"]
+        NeuroShunter -->|"ACTION"| SkillManager["🛠️ 技能膠囊"]
     end
 ```
+
+### 🧠 技術深潛
+- **Browser-in-the-Loop**: 與傳統基於 API 的機器人不同，Golem 使用 Puppeteer 在 Web Gemini 上模擬人類行為。這提供了免費訪問 **1M+ Token 無限上下文視窗** 的能力。
+- **Reflex Shunting**: Golem 的大腦產出結構化的 `GOLEM_PROTOCOL` 指令而非純文字。這讓代理人能精準決定何時該說話、何時該記憶、以及何時該執行技能腳本。
+
+---
+
+## 🧠 金字塔式長期記憶 (Pyramidal Long-term Memory)
+
+這是 Golem 最獨特的技術能力，透過多層級壓縮確保記憶永不丟失：
+
+1. **第 0 層 (Tier 0)**: 每小時原始對話日誌。
+2. **第 1 層 (Daily)**: 每日摘要（約 1,500 字）。
+3. **第 2 層 (Monthly)**: 每月亮點。
+4. **第 3 層 (Yearly)**: 年度回顧。
+5. **第 4 層 (Epoch)**: 紀元里程碑。
+
+**50 年存儲對比：**
+* **傳統模式 (無壓縮)**: ~18,250 檔案 / 500 MB+
+* **Golem 金字塔**: **~277 檔案 / 3 MB**
+
+---
 
 ---
 
@@ -185,7 +220,8 @@ graph TD
   <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
 </a>
 
-[💬 加入 Line 社群：Project Golem AI 系統代理群](https://line.me/ti/g2/wqhJdXFKfarYxBTv34waWRpY_EXSfuYTbWc4OA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default)
+[💬 加入 Line 社群：Project Golem AI 系統代理群](https://line.me/ti/g2/wqhJdXFKfarYxBTv34waWRpY_EXSfuYTbWc4OA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default)  
+[👾 加入 Discord 社群：Project Golem 官方頻道](https://discord.gg/bC6jtFQra)
 
 ---
 

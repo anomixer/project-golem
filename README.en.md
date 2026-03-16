@@ -12,11 +12,11 @@
   </p>
 
   <p>
-    <a href="#✨-what-is-this">Introduction</a> •
-    <a href="#🚀-core-capabilities">Capabilities</a> •
-    <a href="#🏗️-system-architecture">Architecture</a> •
-    <a href="#🎨-showcase">Showcase</a> •
-    <a href="#⚡-quick-start">Quick Start</a>
+    <a href="#✨-what-is-this">What is this?</a> •
+    <a href="#🌟-core-capabilities">Capabilities</a> •
+    <a href="#📸-use-cases--interface-showcase">Showcase</a> •
+    <a href="#⚡-quick-start">Quick Start</a> •
+    <a href="#🏗️-system-architecture">Architecture</a>
   </p>
 
   [繁體中文](README.md) | **English**
@@ -26,11 +26,13 @@
 
 ## 📖 Table of Contents
 - [✨ What is this?](#-what-is-this)
-- [🚀 Core Capabilities](#-core-capabilities)
-- [🏗️ System Architecture](#️-system-architecture)
-- [🎨 Showcase](#-showcase)
+- [🌟 Core Capabilities](#-core-capabilities)
+- [📸 Use Cases & Interface Showcase](#-use-cases--interface-showcase)
 - [⚡ Quick Start](#-quick-start)
-- [📂 Project Structure](#-project-structure)
+- [🎮 Command Reference](#-command-reference)
+- [🏗️ System Architecture](#️-system-architecture)
+- [🧠 Pyramidal Long-term Memory](#-pyramidal-long-term-memory)
+- [📖 Complete Documentation & Guides](#-complete-documentation--guides)
 
 ---
 
@@ -47,7 +49,7 @@
 
 ---
 
-## 🚀 Core Capabilities
+## 🌟 Core Capabilities
 
 <table width="100%">
   <tr>
@@ -71,74 +73,6 @@
     </td>
   </tr>
 </table>
-
----
-
----
-
-## 🏗️ System Architecture
-
-Golem utilizes the unique **Browser-in-the-Loop** hybrid architecture, granting it flexibility beyond standard API limitations.
-
-```mermaid
-graph TD
-    User["👤 User"] -->|"Platform Abstraction"| UniversalContext
-    UniversalContext -->|"Debounce Queue"| ConversationManager
-    ConversationManager -->|"LLM Kernel"| GolemBrain
-    GolemBrain -->|"Parse Protocol"| NeuroShunter
-    
-    subgraph Reflex ["Reflex Shunting"]
-        NeuroShunter -->|"REPLY"| User
-        NeuroShunter -->|"MEMORY"| LongTermMemory["🧠 Pyramid Memory"]
-        NeuroShunter -->|"ACTION"| SkillManager["🛠️ Skill Capsule"]
-    end
-```
-
-### 🧠 Technical Deep Dive
-- **Browser-in-the-Loop**: Unlike traditional API-based bots, Golem uses Puppeteer to simulate human behavior on Web Gemini. This provides access to the **1M+ Token Infinite Context Window** for free.
-- **Reflex Shunting**: Golem's brain produces structured `GOLEM_PROTOCOL` instructions instead of raw text. This allows the agent to precisely determine when to talk, when to remember, and when to execute skill scripts.
-
----
-
-## 🗺️ Roadmap
-
-- [x] **v9.1**: Current stable release with Pyramid Memory and multi-platform integration.
-- [ ] **v9.5**: Visual Perception - enabling Golem to "see" and interpret screenshots.
-- [ ] **v10.0**: Self-Evolution Core - allowing Golem to modify its own code based on environmental feedback.
-
----
-
-## 📂 Repository Structure
-
-```text
-.
-├── assets/           # Static assets and screenshots
-├── src/
-│   ├── brains/       # Core LLM parsing logic
-│   ├── skills/       # Actionable modules (Search, Draw, etc.)
-│   ├── memory/       # Pyramid compression algorithms
-│   └── dashboard/    # Next.js tactical dashboard
-├── docs/             # In-depth technical documentation
-└── setup.sh          # One-click installation script
-```
-
----
-
-## 🧠 Pyramidal Long-term Memory
-
-This is Golem's most unique technical capability, ensuring memory is never lost through multi-tier compression:
-
-1. **Tier 0**: Hourly raw conversation logs.
-2. **Tier 1 (Daily)**: Daily summaries (~1,500 words).
-3. **Tier 2 (Monthly)**: Monthly highlights.
-4. **Tier 3 (Yearly)**: Yearly reviews.
-5. **Tier 4 (Epoch)**: Epoch milestones.
-
-**50-Year Storage Comparison:**
-* **Legacy (No Compression)**: ~18,250 files / 500 MB+
-* **Golem Pyramid**: **~277 files / 3 MB**
-
----
 
 ---
 
@@ -185,16 +119,9 @@ To help you better monitor and manage your Golem, we provide a fully functional 
 - **Google Chrome** (Required for Puppeteer)
 - **Telegram Bot Token** (Get from [@BotFather](https://t.me/BotFather))
 
-### Installation & Startup
-
-**🪟 Windows Setup**
-> **Tip:** For the best experience, we strongly recommend Windows users use **[Git Bash](https://git-scm.com/downloads)** to run the setup script.
-
-1. Open Git Bash.
-2. Navigate to the project directory.
-3. Run `./setup.sh --magic` for automated installation and startup.
-
-Alternatively, you can still run `setup.bat` directly if preferred.
+### ⚡ Recommended: One-click Magic Mode
+For first-time users, we provide a fully automated setup script.
+Double-click `Start-Golem.command` (Mac/Linux) or `setup.bat` (Windows) in the project directory. It will automatically download dependencies and start the Node server and Dashboard.
 
 **🔨 Manual Operation (Terminal)**
 ```bash
@@ -221,6 +148,51 @@ chmod +x setup.sh
 
 ---
 
+### Windows
+> **Tip:** For the best experience, we strongly recommend Windows users use **[Git Bash](https://git-scm.com/downloads)** to run the setup script.
+
+1. Open Git Bash.
+2. Navigate to the project directory.
+3. Run `./setup.sh --magic` for automated installation and startup.
+
+## 🏗️ System Architecture
+
+Golem utilizes the unique **Browser-in-the-Loop** hybrid architecture, granting it flexibility beyond standard API limitations.
+
+```mermaid
+graph TD
+    User["👤 User"] -->|"Platform Abstraction"| UniversalContext
+    UniversalContext -->|"Debounce Queue"| ConversationManager
+    ConversationManager -->|"LLM Kernel"| GolemBrain
+    GolemBrain -->|"Parse Protocol"| NeuroShunter
+    
+    subgraph Reflex ["Reflex Shunting"]
+        NeuroShunter -->|"REPLY"| User
+        NeuroShunter -->|"MEMORY"| LongTermMemory["🧠 Pyramid Memory"]
+        NeuroShunter -->|"ACTION"| SkillManager["🛠️ Skill Capsule"]
+    end
+```
+
+### 🧠 Technical Deep Dive
+- **Browser-in-the-Loop**: Unlike traditional API-based bots, Golem uses Puppeteer to simulate human behavior on Web Gemini. This provides access to the **1M+ Token Infinite Context Window** for free.
+- **Reflex Shunting**: Golem's brain produces structured `GOLEM_PROTOCOL` instructions instead of raw text. This allows the agent to precisely determine when to talk, when to remember, and when to execute skill scripts.
+
+---
+
+## 🧠 Pyramidal Long-term Memory
+
+This is Golem's most unique technical capability, ensuring memory is never lost through multi-tier compression:
+
+1. **Tier 0**: Hourly raw conversation logs.
+2. **Tier 1 (Daily)**: Daily summaries (~1,500 words).
+3. **Tier 2 (Monthly)**: Monthly highlights.
+4. **Tier 3 (Yearly)**: Yearly reviews.
+5. **Tier 4 (Epoch)**: Epoch milestones.
+
+**50-Year Storage Comparison:**
+* **Legacy (No Compression)**: ~18,250 files / 500 MB+
+* **Golem Pyramid**: **~277 files / 3 MB**
+
 ---
 
 ## 📖 Complete Documentation & Guides
@@ -235,6 +207,19 @@ To keep this page concise, more in-depth technical details have been moved to de
 | [🛠️ Developer Implementation Guide](docs/開發者實作指南.md) | How to implement new Skills and Golem Protocol specifications |
 | [🎮 Command Reference List](docs/golem指令說明一覽表.md) | Quick reference for Telegram / Discord commands |
 | [🔑 Getting Robot Tokens](docs/如何獲取TG或DC的Token及開啟權限.md) | How to set up your external communication platforms |
+
+---
+
+## ☕ Support & Community
+
+If Golem has helped you, feel free to give it a star ⭐️, or buy the author a coffee!
+
+<a href="https://www.buymeacoffee.com/arvincreator" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
+</a>
+
+[💬 Join Line Community (ZH)](https://line.me/ti/g2/wqhJdXFKfarYxBTv34waWRpY_EXSfuYTbWc4OA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default)  
+[👾 Join Discord Community](https://discord.gg/bC6jtFQra)
 
 ---
 
