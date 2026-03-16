@@ -181,16 +181,23 @@ class PageInteractor {
         const payloadLength = textToPaste.length;
         console.log(`📝 [PageInteractor] 準備植入文字 (長度: ${payloadLength})...`);
 
+        // 1. 先使用 page.focus 確保焦點在輸入框上
+        try {
+            await this.page.focus(targetSelector);
+        } catch (e) {
+            console.warn(`⚠️ [PageInteractor] focus 失敗: ${e.message}`);
+        }
+
+        // 2. 模擬真實鍵盤輸入 (對於 ProseMirror 這種複雜編輯器，這比單純塞 value 更好)
+        // 為了效能與穩定平衡，我們先用 evaluate 注入大塊內容，再模擬鍵盤觸發事件
         await this.page.evaluate((s, t) => {
             const el = document.querySelector(s);
             if (!el) return;
-            el.focus();
-
-            // ✨ [進化版清空與植入] 確保完整性並觸發應用程式監聽
+            
+            // 針對 contenteditable 使用更強大的模擬植入
             if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
                 el.value = t;
             } else {
-                // 針對 contenteditable 使用更強大的模擬植入
                 el.innerText = t;
             }
 
@@ -200,12 +207,18 @@ class PageInteractor {
                 el.dispatchEvent(new Event(name, { bubbles: true, cancelable: true }));
             });
 
-            // 嘗試使用 execCommand 作為補充 (有些編輯器只認這個)
-            if (el.innerText !== t && el.value !== t) {
-                document.execCommand('selectAll', false, null);
-                document.execCommand('insertText', false, t);
-            }
+            // 確保游標在最後
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
         }, targetSelector, textToPaste);
+
+        // 3. 額外觸發一個小的鍵盤事件，確保某些框架監聽的 focus/input 狀態被啟動
+        await this.page.keyboard.type(' ', { delay: 1 });
+        await this.page.keyboard.press('Backspace');
     }
 
     async _clickSend(sendSelector) {
@@ -214,11 +227,15 @@ class PageInteractor {
         // 1. Enter 爆破
         await this.page.keyboard.press('Enter');
 
-        // 2. 實體按鈕補強 (有些 UI 只有點擊按鈕才能觸發正確的 state)
+        // 2. 實體按鈕補強 (優先使用 ARIA Label 狙擊)
         await this.page.evaluate((s) => {
-            const btn = document.querySelector(s) ||
-                document.querySelector('button[aria-label*="發送"], button[aria-label*="Send"], button[disabled="false"]');
-        if (btn && btn.offsetHeight > 0) btn.click();
+            const btn = document.querySelector('button[aria-label*="發送"], button[aria-label*="Send"], button[aria-label*="傳送"]') ||
+                        document.querySelector(s) ||
+                        document.querySelector('button[disabled="false"]');
+            if (btn && btn.offsetHeight > 0) {
+                btn.focus();
+                btn.click();
+            }
         }, sendSelector);
 
         // 3. 自動置底 (最小化干擾)
@@ -231,8 +248,11 @@ class PageInteractor {
      * 🚀 自動將 Chrome 視窗移動到螢幕最底部 (不影響使用者日常操作)
      */
     async _moveWindowToBottom() {
+        // ✨ [Headless 優化] 若為無頭模式，不需要移動視窗
+        if (process.env.PUPPETEER_HEADLESS === 'true') return;
+
         try {
-            console.log("⚓ [PageInteractor] 正在將 Chrome 視窗自動移動至置底位置...");
+            console.log("⚓ [PageInteractor] 正在將 Chrome 視窗自動移動至隱藏位置...");
             const session = await this.page.target().createCDPSession();
             const { windowId } = await session.send('Browser.getWindowForTarget');
             
@@ -241,22 +261,19 @@ class PageInteractor {
                 height: window.screen.availHeight
             }));
             
-            const windowWidth = 50;
-            const windowHeight = 50;
-
             // 將視窗移動到螢幕垂直座標之外 (隱身術)
             await session.send('Browser.setWindowBounds', {
                 windowId,
                 bounds: {
                     left: 0,
                     top: screen.height + 1000,
-                    width: windowWidth,
-                    height: windowHeight,
+                    width: 50,
+                    height: 50,
                     windowState: 'normal'
                 }
             });
             await session.detach();
-            console.log("✅ [PageInteractor] 視窗已成功移至螢幕外 (隱藏)。");
+            console.log("✅ [PageInteractor] 視窗已成功移動。");
         } catch (e) {
             console.warn(`⚠️ [PageInteractor] 視窗移動失敗: ${e.message}`);
         }
