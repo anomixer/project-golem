@@ -394,7 +394,7 @@ class GolemBrain {
         // 5. 重新開啟對話視窗 (New Chat) 後再注入
         console.log(`🔄 [Brain][${this.golemId}] 正在開啟新的 ${this.backend === 'perplexity' ? 'Perplexity' : 'Gemini'} 對話視窗...`);
         const targetUrl = this.backend === 'perplexity' ? URLS.PERPLEXITY_APP : URLS.GEMINI_APP;
-        await this.page.goto(targetUrl, { waitUntil: 'networkidle2' });
+        await this.page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
         await this._injectSystemPrompt(true);
         console.log(`✅ [Brain][${this.golemId}] 完整重啟流程執行完畢 (Config + Skill + Protocol)。`);
