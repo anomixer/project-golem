@@ -41,6 +41,13 @@ class PageInteractor {
         }
 
         try {
+            // 🚀 利用 macOS AppleScript 將 Chrome 隱藏至背景，避免接下來的 focus() 搶走終端機焦點
+            if (process.platform === 'darwin') {
+                const { exec } = require('child_process');
+                exec(`osascript -e 'tell application "System Events" to set visible of process "Google Chrome for Testing" to false' >/dev/null 2>&1`);
+                exec(`osascript -e 'tell application "System Events" to set visible of process "Google Chrome" to false' >/dev/null 2>&1`);
+            }
+
             // 0. 確保頁面處於空閒狀態 (避免前一則訊息還在發送中)
             await this._waitForReady(selectors.send);
 
