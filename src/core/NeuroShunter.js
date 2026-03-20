@@ -69,8 +69,8 @@ class NeuroShunter {
         }
 
         // 2. 處理結構化 Action 分配 (讓批准視窗在回覆之後彈出)
-        if (parsed.actions.length > 0 && !shouldSuppressReply) {
-            console.log(`[GOLEM_ACTION]\n${JSON.stringify(parsed.actions, null, 2)}`);
+        if (parsed.actions.length > 0) {
+            console.log(`[GOLEM_ACTION] (${shouldSuppressReply ? 'Silent' : 'Normal'})\n${JSON.stringify(parsed.actions, null, 2)}`);
             const normalActions = [];
 
             for (const act of parsed.actions) {
@@ -82,7 +82,7 @@ class NeuroShunter {
                         // 檢查是否為動態擴充技能
                         const isSkillHandled = await SkillHandler.execute(ctx, act, brain);
                         if (!isSkillHandled) {
-                            // 若不是已知框架 Action 且非動態技能，則視為底層 Shell 指令
+                            // 若不是已知框架 Action 和非動態技能，則視為底層 Shell 指令
                             normalActions.push(act);
                         }
                         break;
@@ -93,8 +93,6 @@ class NeuroShunter {
             if (normalActions.length > 0) {
                 await CommandHandler.execute(ctx, normalActions, controller, brain, (c, r, b, ctrl) => this.dispatch(c, r, b, ctrl, options));
             }
-        } else if (parsed.actions.length > 0 && shouldSuppressReply) {
-            console.log(`🤫 [NeuroShunter] 靜默模式，跳過 ${parsed.actions.length} 個 Action 的執行。`);
         }
     }
 }
