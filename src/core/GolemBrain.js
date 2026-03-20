@@ -4,10 +4,8 @@
 const path = require('path');
 const ConfigManager = require('../config');
 const DOMDoctor = require('../services/DOMDoctor');
-const BrowserMemoryDriver = require('../memory/BrowserMemoryDriver');
-const SystemQmdDriver = require('../memory/SystemQmdDriver');
-const SystemNativeDriver = require('../memory/SystemNativeDriver');
 const LanceDBMemoryDriver = require('../memory/LanceDBMemoryDriver');
+const SystemNativeDriver = require('../memory/SystemNativeDriver');
 
 const BrowserLauncher = require('./BrowserLauncher');
 const ProtocolFormatter = require('../services/ProtocolFormatter');
@@ -30,7 +28,6 @@ class GolemBrain {
         // ── 瀏覽器狀態 ──
         this.context = null; // Playwright BrowserContext
         this.page = null;
-        this.memoryPage = null;
         this.cdpSession = null;
 
         // ── DOM 修復服務 ──
@@ -38,12 +35,15 @@ class GolemBrain {
         this.selectors = this.doctor.loadSelectors();
 
         // ── 記憶引擎 ──
-        const mode = ConfigManager.cleanEnv(process.env.GOLEM_MEMORY_MODE || 'browser').toLowerCase();
+        // 🎯 [優化] 預設切換為 LanceDB (本地向量資料庫)，移除瀏覽器模式以節省資源
+        const mode = ConfigManager.cleanEnv(process.env.GOLEM_MEMORY_MODE || 'lancedb').toLowerCase();
         console.log(`⚙️ [System] 記憶引擎模式: ${mode.toUpperCase()} (Golem: ${this.golemId})`);
-        if (mode === 'qmd') this.memoryDriver = new SystemQmdDriver();
-        else if (mode === 'lancedb') this.memoryDriver = new LanceDBMemoryDriver();
-        else if (mode === 'native' || mode === 'system') this.memoryDriver = new SystemNativeDriver();
-        else this.memoryDriver = new BrowserMemoryDriver(this);
+
+        if (mode === 'native' || mode === 'system') {
+            this.memoryDriver = new SystemNativeDriver();
+        } else {
+            this.memoryDriver = new LanceDBMemoryDriver();
+        }
 
         // ── 對話日誌 ──
         this.chatLogManager = new ChatLogManager({
@@ -301,7 +301,7 @@ class GolemBrain {
             const { downloadFile } = require('../utils/HttpUtils');
             const path = require('path');
             const { v4: uuidv4 } = require('uuid');
-            
+
             const localAttachments = [];
             for (const att of result.attachments) {
                 try {
@@ -312,14 +312,14 @@ class GolemBrain {
                     if (matchedExt) ext = matchedExt[1];
                     else if (att.mimeType === 'image/png') ext = 'png';
                     else if (att.mimeType === 'application/pdf') ext = 'pdf';
-                    
+
                     const fileName = `gemini_res_${Date.now()}_${uuidv4().substring(0, 8)}.${ext}`;
                     const projectRoot = path.resolve(__dirname, '../../');
                     const localPath = path.join(projectRoot, 'data', 'temp_uploads', fileName);
-                    
+
                     await downloadFile(att.url, localPath);
                     console.log(`✅ [Brain] Gemini 回應附件已下載 [${ext}]: ${fileName}`);
-                    
+
                     localAttachments.push({
                         url: `/api/files/${fileName}`,
                         path: localPath,

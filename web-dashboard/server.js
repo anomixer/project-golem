@@ -1300,7 +1300,7 @@ class WebServer {
                 return res.json({
                     version,
                     userDataDir: envVars.USER_DATA_DIR || './golem_memory',
-                    golemMemoryMode: envVars.GOLEM_MEMORY_MODE || 'browser',
+                    golemMemoryMode: envVars.GOLEM_MEMORY_MODE || 'lancedb',
                     golemEmbeddingProvider: envVars.GOLEM_EMBEDDING_PROVIDER || 'gemini',
                     golemLocalEmbeddingModel: envVars.GOLEM_LOCAL_EMBEDDING_MODEL || 'Xenova/bge-small-zh-v1.5',
                     golemMode: 'SINGLE'

@@ -102,6 +102,21 @@ class LanceDBMemoryDriver {
         if (!this.table) return [];
 
         try {
+            if (!query || query.trim() === "") {
+                // If empty query, return latest records instead of vector search
+                const results = await this.table
+                    .query()
+                    .limit(limit * 2)
+                    .toArray();
+                
+                return results.map(row => ({
+                    text: row.text,
+                    score: 1.0, // Default full score for direct list
+                    metadata: JSON.parse(row.metadata || '{}'),
+                    timestamp: row.last_accessed
+                })).sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+            }
+
             const queryVector = await this._getEmbedding(query);
             
             // 向量檢索
@@ -182,6 +197,37 @@ class LanceDBMemoryDriver {
             this.table = null;
         } catch (e) {
             console.error("❌ [Memory:LanceDB] 清空失敗:", e.message);
+        }
+    }
+
+    async exportMemory() {
+        if (!this.table) return JSON.stringify([]);
+        try {
+            const all = await this.table.query().toArray();
+            const filtered = all.map(row => ({
+                text: row.text,
+                metadata: JSON.parse(row.metadata || '{}')
+            }));
+            return JSON.stringify(filtered, null, 2);
+        } catch (e) {
+            console.error("❌ [Memory:LanceDB] Export failed:", e.message);
+            return JSON.stringify([]);
+        }
+    }
+
+    async importMemory(jsonData) {
+        try {
+            const list = JSON.parse(jsonData);
+            if (!Array.isArray(list)) return { success: false, error: "Must be an array" };
+            
+            console.log(`📥 [Memory:LanceDB] 正在匯入 ${list.length} 條記憶...`);
+            for (const item of list) {
+                await this.memorize(item.text, item.metadata || {});
+            }
+            return { success: true, count: list.length };
+        } catch (e) {
+            console.error("❌ [Memory:LanceDB] Import failed:", e.message);
+            return { success: false, error: e.message };
         }
     }
 }

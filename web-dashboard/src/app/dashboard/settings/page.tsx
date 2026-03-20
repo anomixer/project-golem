@@ -893,13 +893,11 @@ export default function SettingsPage() {
                                     </h2>
                                     <SettingSelectField
                                         label="記憶引擎模式"
-                                        desc="browser: 內建 memory.html | lancedb: 高效向量資料庫 | qmd: 混合搜尋"
-                                        value={config.env.GOLEM_MEMORY_MODE || "browser"}
+                                        desc="系統已鎖定為 LanceDB 高效向量資料庫，以確保最佳效能與穩定性。"
+                                        value={config.env.GOLEM_MEMORY_MODE || "lancedb"}
                                         onChange={(val) => handleChangeEnv("GOLEM_MEMORY_MODE", val)}
                                         options={[
-                                            { value: "browser", label: "Browser (預設)" },
-                                            { value: "lancedb", label: "LanceDB (高效能 Pro 版)" },
-                                            { value: "qmd", label: "QMD (進階混合)" }
+                                            { value: "lancedb", label: "LanceDB (高效能 Pro 版)" }
                                         ]}
                                     />
 

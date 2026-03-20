@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 import { useGolem } from "@/components/GolemContext";
 
-type MemoryMode = "browser" | "qmd" | "lancedb";
+type MemoryMode = "lancedb";
 
 const LOCAL_MODELS = [
     {
@@ -56,7 +56,7 @@ export default function SystemSetupPage() {
 
     const [geminiKeys, setGeminiKeys] = useState("");
     const [userDataDir, setUserDataDir] = useState("./golem_memory");
-    const [memoryMode, setMemoryMode] = useState<MemoryMode>("browser");
+    const [memoryMode, setMemoryMode] = useState<MemoryMode>("lancedb");
     const golemMode = "SINGLE";
     const [showKeys, setShowKeys] = useState(false);
     const [embeddingProvider, setEmbeddingProvider] = useState<"gemini" | "local">("local");
@@ -73,7 +73,7 @@ export default function SystemSetupPage() {
             .then(r => r.json())
             .then(data => {
                 setUserDataDir(data.userDataDir || "./golem_memory");
-                setMemoryMode((data.golemMemoryMode as MemoryMode) || "browser");
+                setMemoryMode("lancedb");
                 setEmbeddingProvider("local");
                 setLocalEmbeddingModel(data.golemLocalEmbeddingModel || "Xenova/bge-small-zh-v1.5");
             })
@@ -210,24 +210,18 @@ export default function SystemSetupPage() {
                         {/* Memory Mode */}
                         <div className="mb-5">
                             <label className="block text-sm font-medium text-gray-400 mb-3">記憶引擎模式</label>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                                 {([
-                                    { value: "browser", label: "Browser 模式", desc: "內建 memory.html，無須額外安裝（推薦）" },
-                                    { value: "lancedb", label: "LanceDB (Pro)", desc: "高效能向量資料庫，支援 Hybrid Search (效能最強)" },
-                                    { value: "qmd", label: "QMD 模式", desc: "混合向量搜尋，需安裝 Bun 與 qmd（進階）" },
+                                    { value: "lancedb", label: "LanceDB Vector Engine", desc: "高效能向量資料庫，支援 Hybrid Search (效能最強)" },
                                 ] as { value: MemoryMode; label: string; desc: string }[]).map(opt => (
                                     <button
                                         key={opt.value}
                                         type="button"
-                                        onClick={() => setMemoryMode(opt.value)}
-                                        className={`p-3 rounded-xl border text-sm font-medium transition-all text-left ${memoryMode === opt.value
-                                            ? "bg-blue-950/30 border-blue-600/50 text-blue-300"
-                                            : "bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700"
-                                            }`}
+                                        className="p-3 rounded-xl border text-sm font-medium transition-all text-left bg-blue-950/30 border-blue-600/50 text-blue-300 cursor-default"
                                     >
                                         <div className="flex items-center justify-between mb-0.5">
                                             <span className="font-bold text-xs">{opt.label}</span>
-                                            {memoryMode === opt.value && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />}
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
                                         </div>
                                         <div className="text-[10px] font-normal opacity-70">{opt.desc}</div>
                                     </button>
