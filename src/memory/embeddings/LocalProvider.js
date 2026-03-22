@@ -2,23 +2,52 @@
  * 🎨 Local Embedding Provider (免 API Key)
  * 使用 Transformers.js 在本地進行運算，具備極佳隱私性。
  */
+const { Worker } = require('worker_threads');
+const path = require('path');
+
 class LocalProvider {
     constructor(modelName = 'Xenova/bge-small-zh-v1.5') {
         this.modelName = modelName;
-        this.pipeline = null;
+        this.worker = null;
+        this.msgId = 0;
+        this.callbacks = new Map();
     }
     
     async _init() {
-        if (this.pipeline) return;
-        const { pipeline } = await import('@xenova/transformers');
-        console.log(`📥 [Memory:Embedding] 正在加載本地模型: ${this.modelName}...`);
-        this.pipeline = await pipeline('feature-extraction', this.modelName);
+        if (this.worker) return;
+        return new Promise((resolve, reject) => {
+            console.log(`📥 [Memory:Embedding] 正在背景啟動本地模型 Worker: ${this.modelName}...`);
+            this.worker = new Worker(path.join(__dirname, 'embeddingWorker.js'), {
+                workerData: { modelName: this.modelName }
+            });
+
+            this.worker.on('message', (msg) => {
+                if (this.callbacks.has(msg.id)) {
+                    const { resolve, reject } = this.callbacks.get(msg.id);
+                    this.callbacks.delete(msg.id);
+                    if (msg.success) resolve(msg.data);
+                    else reject(new Error(msg.error));
+                }
+            });
+
+            this.worker.on('error', (err) => {
+                console.error('❌ [Memory:Embedding] Worker error:', err);
+                reject(err);
+            });
+
+            const id = ++this.msgId;
+            this.callbacks.set(id, { resolve: () => resolve(), reject });
+            this.worker.postMessage({ type: 'init', id });
+        });
     }
     
     async getEmbedding(text) {
         await this._init();
-        const output = await this.pipeline(text, { pooling: 'mean', normalize: true });
-        return Array.from(output.data);
+        return new Promise((resolve, reject) => {
+            const id = ++this.msgId;
+            this.callbacks.set(id, { resolve, reject });
+            this.worker.postMessage({ type: 'embed', id, text });
+        });
     }
     
     getIdentifier() { 
