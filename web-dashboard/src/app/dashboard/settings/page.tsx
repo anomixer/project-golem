@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Settings, Save, RefreshCw, AlertTriangle, CheckCircle2,
     Eye, EyeOff, Lock, Users, Server, Activity, Cpu, HardDrive,
@@ -328,6 +328,7 @@ const SystemUpdateSection = () => {
     const [keepMemory, setKeepMemory] = useState(true);
     const [updateDone, setUpdateDone] = useState(false);
     const [logInfo, setLogInfo] = useState<{ size: string, bytes: number } | null>(null);
+    const socketRef = useRef<any>(null);
 
     // Initial check for update and log info
     useEffect(() => {
@@ -363,8 +364,27 @@ const SystemUpdateSection = () => {
     }, []);
 
     useEffect(() => {
-        if (!isUpdating && !showModal) return;
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, []);
+
+    const handleStartUpdate = async () => {
+        setIsUpdating(true);
+        setProgress(0);
+        setStatusText("連接更新伺服器中...");
+        setUpdateDone(false);
+
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+        }
+
         const socket = io(window.location.origin);
+        socketRef.current = socket;
+
         socket.on('system:update_progress', (data: any) => {
             if (data.status === 'running') {
                 setStatusText(data.message);
@@ -374,29 +394,30 @@ const SystemUpdateSection = () => {
                 setProgress(100);
                 setUpdateDone(true);
                 setIsUpdating(false);
+                socket.disconnect();
+                socketRef.current = null;
             } else if (data.status === 'error') {
                 setStatusText(data.message);
                 setIsUpdating(false);
+                socket.disconnect();
+                socketRef.current = null;
             }
         });
-        return () => { socket.disconnect(); };
-    }, [isUpdating, showModal]);
 
-    const handleStartUpdate = async () => {
-        setIsUpdating(true);
-        setProgress(0);
-        setStatusText("準備更新...");
-        setUpdateDone(false);
-        try {
-            await fetch("/api/system/update/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ keepOldData, keepMemory })
-            });
-        } catch (e) {
-            setStatusText("啟動更新程序失敗");
-            setIsUpdating(false);
-        }
+        socket.on('connect', async () => {
+            try {
+                await fetch("/api/system/update/execute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ keepOldData, keepMemory })
+                });
+            } catch (e) {
+                setStatusText("啟動更新程序失敗");
+                setIsUpdating(false);
+                socket.disconnect();
+                socketRef.current = null;
+            }
+        });
     };
 
     const handleRestart = async () => {
@@ -710,11 +731,16 @@ export default function SettingsPage() {
                 try {
                     const checkRes = await fetch("/api/system/status");
                     if (checkRes.ok) {
-                        clearInterval(pollInterval);
-                        setStatusMessage({ type: 'success', text: "重新啟動完成！頁面即將重新載入..." });
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
+                        const data = await checkRes.json();
+                        if (!data.isBooting) {
+                            clearInterval(pollInterval);
+                            setStatusMessage({ type: 'success', text: "重新啟動完成！頁面即將重新載入..." });
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            setStatusMessage({ type: 'warning', text: "系統正在初始化中..." });
+                        }
                     }
                 } catch (err) {
                     // Ignore errors, it means the server is simply offline and still rebooting

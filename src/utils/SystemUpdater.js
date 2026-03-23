@@ -120,7 +120,7 @@ class SystemUpdater {
     static async update(options, io) {
         const env = await this.checkEnvironment();
         if (env.installMode === 'git') {
-            await this.updateViaGit(options, io);
+            await this.updateViaGit(options, io, env.gitInfo);
         } else {
             await this.updateViaZip(options, io);
         }
@@ -140,14 +140,15 @@ class SystemUpdater {
     static async execAsync(command, options = {}) {
         const util = require('util');
         const exec = util.promisify(require('child_process').exec);
+        const finalOptions = { maxBuffer: 1024 * 1024 * 50, timeout: 300000, ...options };
         try {
-            await exec(command, options);
+            await exec(command, finalOptions);
         } catch (e) {
             throw e;
         }
     }
 
-    static async updateViaGit(options, io) {
+    static async updateViaGit(options, io, gitInfo) {
         // Wait briefly so the frontend socket has time to connect
         await this.sleep(1000);
         this.broadcast(io, 'running', '開始執行 Git 更新流程...', 0);
@@ -157,39 +158,45 @@ class SystemUpdater {
             this.broadcast(io, 'running', '儲存本地暫存變更 (git stash)...', 10);
             try { await this.execAsync('git stash', { cwd: rootDir }); } catch (e) { }
 
-            this.broadcast(io, 'running', '執行 git fetch --all 同步所有遠端資訊...', 20);
-            await this.execAsync('git fetch --all', { cwd: rootDir });
-
             let currentBranch = 'main';
             let targetRemote = 'origin';
-            try {
-                const util = require('util');
-                const exec = util.promisify(require('child_process').exec);
 
-                const { stdout: branchOut } = await exec('git rev-parse --abbrev-ref HEAD', { cwd: rootDir });
-                currentBranch = branchOut.trim();
+            if (gitInfo && gitInfo.targetRemote) {
+                currentBranch = gitInfo.currentBranch;
+                targetRemote = gitInfo.targetRemote;
+            } else {
+                this.broadcast(io, 'running', '執行 git fetch --all 同步所有遠端資訊...', 20);
+                await this.execAsync('git fetch --all', { cwd: rootDir });
 
-                const { stdout: rbOut } = await exec('git branch -r', { cwd: rootDir });
-                const remoteBranches = rbOut.trim().split('\n').map(b => b.trim());
+                try {
+                    const util = require('util');
+                    const exec = util.promisify(require('child_process').exec);
 
-                const { stdout: rOut } = await exec('git remote', { cwd: rootDir });
-                const remotes = rOut.trim().split('\n');
+                    const { stdout: branchOut } = await exec('git rev-parse --abbrev-ref HEAD', { cwd: rootDir });
+                    currentBranch = branchOut.trim();
 
-                const priorityRemotes = ['upstream', 'origin', ...remotes.filter(r => r !== 'upstream' && r !== 'origin')];
-                let foundMatch = false;
-                for (const r of priorityRemotes) {
-                    if (remoteBranches.includes(`${r}/${currentBranch}`)) {
-                        targetRemote = r;
-                        foundMatch = true;
-                        break;
+                    const { stdout: rbOut } = await exec('git branch -r', { cwd: rootDir });
+                    const remoteBranches = rbOut.trim().split('\n').map(b => b.trim());
+
+                    const { stdout: rOut } = await exec('git remote', { cwd: rootDir });
+                    const remotes = rOut.trim().split('\n');
+
+                    const priorityRemotes = ['upstream', 'origin', ...remotes.filter(r => r !== 'upstream' && r !== 'origin')];
+                    let foundMatch = false;
+                    for (const r of priorityRemotes) {
+                        if (remoteBranches.includes(`${r}/${currentBranch}`)) {
+                            targetRemote = r;
+                            foundMatch = true;
+                            break;
+                        }
                     }
-                }
 
-                if (!foundMatch) {
-                    console.warn(`[SystemUpdater] No remote branch matches ${currentBranch}, fallback to ${targetRemote}`);
+                    if (!foundMatch) {
+                        console.warn(`[SystemUpdater] No remote branch matches ${currentBranch}, fallback to ${targetRemote}`);
+                    }
+                } catch (e) {
+                    console.warn("[SystemUpdater] Git detection failed, using defaults");
                 }
-            } catch (e) {
-                console.warn("[SystemUpdater] Git detection failed, using defaults");
             }
 
             this.broadcast(io, 'running', `從遠端拉取代碼 (git pull ${targetRemote} ${currentBranch})...`, 30);
@@ -225,7 +232,7 @@ class SystemUpdater {
         try {
             // 1. Download
             this.broadcast(io, 'running', '從 GitHub 下載最新版本...', 10);
-            const repoUrl = 'https://github.com/sz9751210/project-golem/archive/refs/heads/main.zip';
+            const repoUrl = 'https://github.com/Arvincreator/project-golem/archive/refs/heads/main.zip';
             const response = await fetch(repoUrl);
             if (!response.ok) throw new Error(`下載 ZIP 失敗: HTTP ${response.status}`);
 
@@ -315,6 +322,7 @@ class SystemUpdater {
             if (fs.existsSync(path.join(rootDir, 'web-dashboard', 'package.json'))) {
                 this.broadcast(io, 'running', '更新 Dashboard 相依套件...', 90);
                 await this.execAsync('npm install', { cwd: path.join(rootDir, 'web-dashboard') });
+                try { await this.execAsync('npm run build', { cwd: path.join(rootDir, 'web-dashboard') }); } catch (e) { }
             }
 
             this.broadcast(io, 'requires_restart', '✨ 更新完成！舊檔案已備份。請點擊重啟按鈕。', 100);
