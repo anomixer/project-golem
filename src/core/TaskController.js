@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const Executor = require('./Executor');
-const SecurityManager = require('../managers/SecurityManager');
+const { SecurityManager } = require('../../packages/security');
 const ToolScanner = require('../managers/ToolScanner');
 const InteractiveMultiAgent = require('./InteractiveMultiAgent');
 

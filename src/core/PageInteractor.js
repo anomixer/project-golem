@@ -2,7 +2,7 @@
 // 🎯 PageInteractor - Gemini 頁面 DOM 互動引擎 (抗 UI 改版強化版 v9.1.5)
 // ============================================================
 const { TIMINGS, LIMITS } = require('./constants');
-const ResponseExtractor = require('./ResponseExtractor');
+const { ResponseExtractor } = require('../../packages/protocol');
 
 // 共用的按鈕偵測關鍵字 (供 autoClick 快速點擊使用)
 const WORKSPACE_SAVE_KEYWORDS = ['儲存活動', '儲存', '建立', '建立活動', 'Save event', 'Save', 'Create'];

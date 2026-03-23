@@ -3,12 +3,12 @@
 // ============================================================
 const fs = require('fs').promises;
 const path = require('path');
-const { getSystemFingerprint } = require('../utils/system');
-const skills = require('../skills');
-const skillManager = require('../managers/SkillManager');
-const skillIndexManager = require('../managers/SkillIndexManager');
-const { resolveEnabledSkills, OPTIONAL_SKILLS } = require('../skills/skillsConfig');
-const ConfigManager = require('../config');
+const { getSystemFingerprint } = require('../../src/utils/system');
+const skills = require('../../src/skills');
+const skillManager = require('../../src/managers/SkillManager');
+const skillIndexManager = require('../../src/managers/SkillIndexManager');
+const { resolveEnabledSkills, OPTIONAL_SKILLS } = require('../../src/skills/skillsConfig');
+const ConfigManager = require('../../src/config');
 
 function getMaxResponseWords() {
     return Number(ConfigManager?.CONFIG?.MAX_RESPONSE_WORDS) || 0;
@@ -154,7 +154,7 @@ ${text}`;
                 // Resolve enabled skills: mandatory always on, optional via env/persona
                 let personaSkills = [];
                 if (golemContext.userDataDir) {
-                    const personaManager = require('../skills/core/persona');
+                    const personaManager = require('../../src/skills/core/persona');
                     const personaData = personaManager.get ? personaManager.get(golemContext.userDataDir) : null;
                     if (personaData && personaData.skills) {
                         personaSkills = personaData.skills;

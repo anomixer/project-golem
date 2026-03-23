@@ -1,6 +1,6 @@
 const LocalProvider = require('./LocalProvider');
 const GeminiProvider = require('./GeminiProvider');
-const { CONFIG } = require('../../config');
+const { CONFIG } = require('../../../src/config');
 
 /**
  * 🧠 Embedding Provider Factory

@@ -2,7 +2,7 @@ const ConfigManager = require('../config');
 const Introspection = require('../services/Introspection');
 const ResponseParser = require('../utils/ResponseParser');
 const PatchManager = require('../managers/PatchManager');
-const NeuroShunter = require('../core/NeuroShunter');
+const { NeuroShunter } = require('../../packages/protocol');
 const path = require('path');
 const fs = require('fs');
 

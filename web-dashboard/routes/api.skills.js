@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { MANDATORY_SKILLS, OPTIONAL_SKILLS: OPTIONAL_SKILL_LIST, resolveEnabledSkills } = require('../../src/skills/skillsConfig');
+const { ProtocolFormatter } = require('../../packages/protocol');
 const { buildOperationGuard } = require('../server/security');
 
 module.exports = function(server) {
@@ -239,7 +240,6 @@ module.exports = function(server) {
                 fs.writeFileSync(envPath, envContent, 'utf8');
             }
 
-            const ProtocolFormatter = require('../../src/services/ProtocolFormatter');
             ProtocolFormatter._lastScanTime = 0;
 
             const SkillIndexManager = require('../../src/managers/SkillIndexManager');
@@ -357,7 +357,6 @@ module.exports = function(server) {
             const idx = new SkillIndexManager(MEMORY_BASE_DIR);
             await idx.removeSkill(safeId).catch(e => console.error(`[SkillIndex] Delete-Remove Error for ${safeId}:`, e.message));
 
-            const ProtocolFormatter = require('../../src/services/ProtocolFormatter');
             ProtocolFormatter._lastScanTime = 0;
 
             return res.json({ success: true, id: safeId });
@@ -370,7 +369,6 @@ module.exports = function(server) {
     router.post('/api/skills/reload', requireSkillAdmin, (req, res) => {
         try {
             console.log("🔄 [WebServer] Hot-reloading skills... Clearing ProtocolFormatter cache.");
-            const ProtocolFormatter = require('../../src/services/ProtocolFormatter');
             ProtocolFormatter._lastScanTime = 0;
             return res.json({ success: true, message: "Skills cache cleared" });
         } catch (e) {
@@ -381,7 +379,6 @@ module.exports = function(server) {
 
     router.post('/api/skills/inject', requireSkillAdmin, async (req, res) => {
         try {
-            const ProtocolFormatter = require('../../src/services/ProtocolFormatter');
             ProtocolFormatter._lastScanTime = 0;
 
             const results = [];

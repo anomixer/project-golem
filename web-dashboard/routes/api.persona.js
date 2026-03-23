@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { resolveActiveContext } = require('./utils/context');
+const { ProtocolFormatter } = require('../../packages/protocol');
 const { buildOperationGuard } = require('../server/security');
 
 module.exports = function registerPersonaRoutes(server) {
@@ -172,10 +173,7 @@ module.exports = function registerPersonaRoutes(server) {
                     console.error('⚠️ [WebServer] Failed to hot-reload persona:', e);
                 }
             } else {
-                try {
-                    const ProtocolFormatter = require('../../src/services/ProtocolFormatter');
-                    ProtocolFormatter._lastScanTime = 0;
-                } catch (e) { }
+                try { ProtocolFormatter._lastScanTime = 0; } catch (e) { }
             }
 
             console.log(`🎭 [WebServer] Persona saved & injection requested for Golem [${golemId}]`);

@@ -4,11 +4,10 @@
 const path = require('path');
 const ConfigManager = require('../config');
 const DOMDoctor = require('../services/DOMDoctor');
-const LanceDBProDriver = require('../memory/LanceDBProDriver');
-const SystemNativeDriver = require('../memory/SystemNativeDriver');
+const { LanceDBProDriver, SystemNativeDriver } = require('../../packages/memory');
 
 const BrowserLauncher = require('./BrowserLauncher');
-const ProtocolFormatter = require('../services/ProtocolFormatter');
+const { ProtocolFormatter } = require('../../packages/protocol');
 const PageInteractor = require('./PageInteractor');
 const ChatLogManager = require('../managers/ChatLogManager');
 const SkillIndexManager = require('../managers/SkillIndexManager');
@@ -390,7 +389,6 @@ class GolemBrain {
             await this.memoryDriver.init();
         } catch (e) {
             console.warn("🔄 [System] 記憶引擎降級為 SystemNativeDriver...");
-            const SystemNativeDriver = require('../memory/SystemNativeDriver');
             this.memoryDriver = new SystemNativeDriver();
             await this.memoryDriver.init();
         }

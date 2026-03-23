@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const KeyChain = require('../services/KeyChain');
-const { CONFIG, KNOWLEDGE_BASE_DIR } = require('../config');
+const KeyChain = require('../../src/services/KeyChain');
+const { CONFIG, KNOWLEDGE_BASE_DIR } = require('../../src/config');
 
 // ✨ 快取 Jiti 實例，避免重複初始化開銷
 let cachedJiti = null;

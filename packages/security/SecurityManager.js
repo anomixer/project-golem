@@ -37,7 +37,7 @@ class SecurityManager {
         this.BLOCK_PATTERNS = [/rm\s+-rf\s+\//, /rd\s+\/s\s+\/q\s+[c-zC-Z]:\\$/, />\s*\/dev\/sd/, /:(){:|:&};:/, /mkfs/, /Format-Volume/, /dd\s+if=/, /chmod\s+[-]x\s+/];
     }
     assess(cmd) {
-        const safeCmd = (cmd || "").trim();
+        const safeCmd = (cmd || '').trim();
         if (this.BLOCK_PATTERNS.some(regex => regex.test(safeCmd))) return { level: 'BLOCKED', reason: '毀滅性指令' };
 
         // --- 全自動執行的開關 (最高層級) ---
@@ -51,12 +51,12 @@ class SecurityManager {
         }
 
         // ✨ [v9.1] 讀取使用者設定的白名單 (環境變數)
-        const userWhitelist = (process.env.COMMAND_WHITELIST || "")
+        const userWhitelist = (process.env.COMMAND_WHITELIST || '')
             .split(',')
             .map(cmd => cmd.trim())
             .filter(cmd => cmd.length > 0);
 
-        const safeguard = require('../utils/CommandSafeguard');
+        const safeguard = require('./CommandSafeguard');
         const dangerousOps = Array.from(new Set([
             'rm', 'mv', 'chmod', 'chown', 'sudo', 'su', 'reboot', 'shutdown', 'npm uninstall', 'Remove-Item', 'Stop-Computer',
             ...safeguard.dangerousOps.map(op => op.split(' ')[0])
@@ -102,7 +102,7 @@ class SecurityManager {
 
     /**
      * 評估指令的風險等級
-     * @param {string} cmd 
+     * @param {string} cmd
      * @returns {number} 0-3 (對應 L0-L3)
      */
     evaluateCommandLevel(cmd) {

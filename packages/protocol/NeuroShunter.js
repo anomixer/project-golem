@@ -1,7 +1,7 @@
-const ResponseParser = require('../utils/ResponseParser');
-const MultiAgentHandler = require('./action_handlers/MultiAgentHandler');
-const SkillHandler = require('./action_handlers/SkillHandler');
-const CommandHandler = require('./action_handlers/CommandHandler');
+const ResponseParser = require('../../src/utils/ResponseParser');
+const MultiAgentHandler = require('../../src/core/action_handlers/MultiAgentHandler');
+const SkillHandler = require('../../src/core/action_handlers/SkillHandler');
+const CommandHandler = require('../../src/core/action_handlers/CommandHandler');
 
 // ============================================================
 // 🧬 NeuroShunter (神經分流中樞 - 核心路由器)
