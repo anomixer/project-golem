@@ -62,7 +62,10 @@ npm install
 npx jest --verbose
 
 # Run specific test file
-npx jest test/EventBus.test.js --verbose
+npx jest tests/EventBus.test.js --verbose
+
+# Check architecture boundaries
+npm run arch:check
 
 # Run with doctor mode (diagnostics)
 node index.js --doctor
@@ -72,8 +75,17 @@ node index.js --doctor
 
 ```
 project-golem/
-├── index.js                    # Entry point
+├── apps/
+│   ├── runtime/
+│   │   └── index.js            # Real runtime entrypoint
+│   └── dashboard/
+│       └── plugin.js           # Dashboard plugin layer
+├── index.js                    # Compatibility shim -> apps/runtime/index.js
+├── dashboard.js                # Compatibility shim -> apps/dashboard/plugin.js
 ├── src/
+│   ├── domain/                 # Domain models and business rules (new skeleton)
+│   ├── application/            # Use-case orchestration layer (new skeleton)
+│   ├── infrastructure/         # Adapters/integrations layer (new skeleton)
 │   ├── core/                   # Brain, Page Interaction, Multi-Agent
 │   │   ├── GolemBrain.js       # Gemini AI brain (Playwright-based)
 │   │   ├── PageInteractor.js   # DOM interaction engine
@@ -81,27 +93,22 @@ project-golem/
 │   │   └── action_handlers/    # Action routing (Android, etc.)
 │   ├── managers/               # Subsystem managers
 │   │   ├── SkillManager.js     # Skill loading & hot-reload
-│   │   ├── SecurityManager.js  # Input validation & security
 │   │   └── DashboardManager.js # Dashboard data provider
-│   ├── memory/                 # Memory drivers
-│   │   ├── LanceDBProDriver.js     # Vector memory (lancedb-pro)
-│   │   └── SystemNativeDriver.js   # Native fallback memory
 │   ├── services/               # Utility services
-│   │   ├── ProtocolFormatter.js    # Titan Protocol formatting
 │   │   └── Introspection.js        # Self-analysis
 │   ├── utils/                  # Shared utilities
 │   │   ├── EventBus.js         # Pub/sub event system
-│   │   ├── CircuitBreaker.js   # Circuit breaker pattern
-│   │   ├── RetryHelper.js      # Exponential backoff retry
 │   │   ├── RateLimiter.js      # Token bucket rate limiting
-│   │   ├── TaskQueue.js        # Priority async task queue
-│   │   └── ProcessManager.js   # Crash recovery & auto-restart
+│   │   ├── ProcessManager.js   # Process health and lifecycle
+│   │   └── SystemLogger.js     # Runtime log persistence/broadcast
 │   └── skills/                 # Skill definitions (.md + .js)
 ├── web-dashboard/              # Next.js dashboard
 │   └── src/
 │       ├── app/                # Pages (dashboard, office, agents)
 │       └── components/         # React components
-├── test/                       # Jest test files
+├── tests/                      # Jest test files
+├── packages/                   # Shared packages (security/memory/protocol)
+├── infra/                      # Reserved for deploy/ops assets
 ├── docker-compose.yml          # Docker Compose config
 ├── render.yaml                 # Render.com Blueprint
 └── fly.toml                    # Fly.io config
@@ -155,17 +162,20 @@ npx jest --verbose
 npx jest --coverage
 
 # Run specific test
-npx jest test/EventBus.test.js
+npx jest tests/EventBus.test.js
 
 # Watch mode (re-run on changes)
 npx jest --watch
+
+# Check architecture boundaries
+npm run arch:check
 ```
 
 ### Test File Naming
 
-- Test files go in `test/` directory
+- Test files go in `tests/` directory
 - Name them `{ModuleName}.test.js`
-- Example: `src/utils/EventBus.js` → `test/EventBus.test.js`
+- Example: `src/utils/EventBus.js` -> `tests/EventBus.test.js`
 
 ### Writing Tests
 

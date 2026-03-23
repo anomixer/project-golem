@@ -31,6 +31,7 @@
 - [⚡ 快速開始](#-快速開始)
 - [🎮 指令速查](#-指令速查-command-reference)
 - [🏗️ 系統架構](#-系統架構)
+- [🗂️ 產品級目錄分層](#-產品級目錄分層)
 - [🧠 金字塔式長期記憶](#-金字塔式長期記憶-pyramidal-long-term-memory)
 - [📖 完整文件與指南](#-完整文件與指南)
 
@@ -145,6 +146,11 @@ ALLOW_REMOTE_ACCESS=false
 # SYSTEM_OP_TOKEN=your-operation-token
 ```
 
+**🏗️ 架構治理檢查**
+```bash
+npm run arch:check
+```
+
 
 ### Windows
 > **建議：** 為了獲得最佳的 Linux 環境模擬體驗，強烈建議 Windows 用戶使用 **[Git Bash](https://git-scm.com/downloads)** 來執行腳本。
@@ -188,6 +194,25 @@ graph TD
 - **Browser-in-the-Loop**: 與傳統基於 API 的機器人不同，Golem 使用 **Playwright** 在 Web Gemini 上模擬人類行為。這提供了免費訪問 **1M+ Token 無限上下文視窗** 的能力。
 - **Reflex Shunting**: Golem 的大腦產出結構化的 `GOLEM_PROTOCOL` 指令而非純文字。這讓代理人能精準決定何時該說話、何時該記憶、以及何時該執行技能腳本。
 
+## 🗂️ 產品級目錄分層
+
+為了支援多人協作與長期演進，專案已改為「產品級分層」：
+
+```text
+project-golem/
+├── apps/
+│   ├── runtime/       # 核心啟動入口（實際執行）
+│   └── dashboard/     # Dashboard 插件層
+├── src/               # 核心領域邏輯（Brain / Memory / Skills / Managers）
+├── web-dashboard/     # Web UI 與 API 路由
+├── packages/          # 共用套件（已落地 security/memory/protocol facade）
+├── infra/             # 預留：部署、監控、環境治理
+├── index.js           # 相容入口（shim，轉發到 apps/runtime）
+└── dashboard.js       # 相容入口（shim，轉發到 apps/dashboard）
+```
+
+> 此次重構採「相容優先」策略：既有指令與腳本可持續使用，同時逐步遷移到大型產品結構。
+
 ---
 
 ## 🧠 金字塔式長期記憶 (Pyramidal Long-term Memory)
@@ -215,6 +240,8 @@ graph TD
 | 文件 | 說明 |
 |------|------|
 | [🤖 編碼代理指南](docs/AGENTS.md) | **[重要]** 供 AI 助理或開發者參考的程式碼維護與架構規範 |
+| [🗂️ 大型產品架構藍圖](docs/大型產品架構藍圖.md) | `apps + packages + infra` 分層策略與遷移路線圖 |
+| [🏗️ 架構治理規範](infra/architecture/README.md) | 分層邊界規則與 `arch:check` 自動檢查 |
 | [🔌 MCP 使用與開發指南](docs/MCP-使用與開發指南.md) | **[最新]** 如何安裝、配置與調用 MCP Server (含 Hacker News 範例) |
 | [🧠 記憶系統架構說明](docs/記憶系統架構說明.md) | 金字塔壓縮原理與存放路徑解析 |
 | [🖥️ Web Dashboard 使用說明](docs/Web-Dashboard-使用說明.md) | Web UI 各個分頁的延伸細節 |

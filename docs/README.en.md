@@ -31,6 +31,7 @@
 - [⚡ Quick Start](#-quick-start)
 - [🎮 Command Reference](#-command-reference)
 - [🏗️ System Architecture](#-system-architecture)
+- [🗂️ Product-scale Project Layout](#-product-scale-project-layout)
 - [🧠 Pyramidal Long-term Memory](#-pyramidal-long-term-memory)
 - [📖 Complete Documentation & Guides](#-complete-documentation--guides)
 
@@ -145,6 +146,11 @@ ALLOW_REMOTE_ACCESS=false
 # SYSTEM_OP_TOKEN=your-operation-token
 ```
 
+**🏗️ Architecture boundary check**
+```bash
+npm run arch:check
+```
+
 ### Windows
 > **Tip:** For the best experience, we strongly recommend Windows users use **[Git Bash](https://git-scm.com/downloads)** to run the setup script.
 
@@ -187,6 +193,25 @@ graph TD
 - **Browser-in-the-Loop**: Unlike traditional API-based bots, Golem uses **Playwright** to simulate human behavior on Web Gemini. This provides access to the **1M+ Token Infinite Context Window** for free.
 - **Reflex Shunting**: Golem's brain produces structured `GOLEM_PROTOCOL` instructions instead of raw text. This allows the agent to precisely determine when to talk, when to remember, and when to execute skill scripts.
 
+## 🗂️ Product-scale Project Layout
+
+To support long-term evolution and team collaboration, the repository now follows a product-scale layered layout:
+
+```text
+project-golem/
+├── apps/
+│   ├── runtime/       # Real runtime entrypoint
+│   └── dashboard/     # Dashboard plugin layer
+├── src/               # Core domain logic (Brain / Memory / Skills / Managers)
+├── web-dashboard/     # Web UI and API routes
+├── packages/          # Shared packages (security/memory/protocol facades)
+├── infra/             # Reserved for deployment/ops assets
+├── index.js           # Compatibility shim -> apps/runtime
+└── dashboard.js       # Compatibility shim -> apps/dashboard
+```
+
+> Migration strategy is compatibility-first: existing commands still work while new modules gradually move into clear layers.
+
 ---
 
 ## 🧠 Pyramidal Long-term Memory
@@ -213,6 +238,8 @@ To keep this page concise, more in-depth technical details have been moved to de
 |------|------|
 | [🔌 MCP Usage & Development Guide](MCP-Guide.en.md) | **[New]** How to install, configure, and call MCP Servers (includes Hacker News example) |
 | [🤖 AI Agent Guide](AGENTS.en.md) | **[Important]** Guidelines for AI assistants and developers on code maintenance |
+| [🗂️ Product Architecture Blueprint](Product-Architecture-Blueprint.en.md) | Layering strategy (`apps + packages + infra`) and migration roadmap |
+| [🏗️ Architecture Governance](../infra/architecture/README.md) | Boundary rules and `arch:check` automation |
 | [🧠 Memory System Architecture](記憶系統架構說明.md) | Pyramid compression principles and storage path analysis |
 | [🖥️ Web Dashboard Guide](Web-Dashboard-Guide.en.md) | Extended details for each tab in the Web UI |
 | [🛠️ Developer Implementation Guide](開發者實作指南.md) | How to implement new Skills and Golem Protocol specifications |
