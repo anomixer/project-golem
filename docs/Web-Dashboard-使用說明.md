@@ -144,6 +144,15 @@ Dashboard 後端主要 API 與即時通訊能力如下：
 | `GET /api/system/security/events` | 讀取安全事件紀錄 |
 | `GET /api/golems` | 取得 Golem 列表 |
 | `POST /api/chat` | 發送 Web 端對話訊息 |
+| `GET /api/diary` | 讀取日記時間軸（含 rotate 結果） |
+| `POST /api/diary/rotate` | 強制執行日記 rotate（7 天保留 + 週/月/年摘要） |
+| `GET /api/diary/rotation/history` | 查詢 rotate 歷史紀錄 |
+| `GET /api/diary/backups` | 列出可用的日記 SQLite 備份 |
+| `GET /api/diary/backup/download?file=...` | 下載指定日記 SQLite 備份檔 |
+| `POST /api/diary/backup` | 建立日記 SQLite 備份 |
+| `POST /api/diary/backup/cleanup` | 立即清理舊備份（依策略） |
+| `GET /api/diary/restore/preview?file=...` | 還原前差異/風險預檢 |
+| `POST /api/diary/restore` | 從指定備份還原日記 SQLite |
 | `GET /api/skills/export` | 匯出技能書（整本或指定技能） |
 | `POST /api/skills/import` | 匯入技能書（支援 JSON/Markdown） |
 | `GET /api/memory` | 查詢向量記憶條目 |
@@ -159,6 +168,19 @@ Dashboard 後端主要 API 與即時通訊能力如下：
 - 敏感操作（例如 system restart/shutdown、MCP 寫入、技能/記憶異動）需通過 operation guard。
 - 若設定 `SYSTEM_OP_TOKEN`，敏感操作需額外提供 `x-system-op-token`。
 - 上傳與附件路徑已做大小與目錄邊界檢查（防止濫用與越界路徑）。
+
+### 日記 Rotate 建議參數
+
+可在設定頁（進階）或 `.env` 調整：
+
+- `DIARY_RAW_RETENTION_DAYS`：原始日記保留天數（最少 7）
+- `DIARY_WEEKLY_RETENTION_DAYS`：週摘要保留天數
+- `DIARY_MONTHLY_RETENTION_DAYS`：月摘要保留天數
+- `DIARY_ROTATE_MIN_INTERVAL_MS`：自動 rotate 最小間隔（毫秒）
+- `DIARY_BACKUP_MAX_FILES`：備份最大保留份數
+- `DIARY_BACKUP_RETENTION_DAYS`：備份保留天數
+
+> 日記儲存已改為 SQLite（WAL），舊版 `diary-book.json` 會在首次啟動時自動遷移。
 
 ---
 

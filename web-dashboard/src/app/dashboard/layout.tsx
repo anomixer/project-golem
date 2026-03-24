@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Globe, ChevronLeft, ChevronRight, Terminal, BrainCircuit, BookOpen, Settings, User, MessageSquare, Plug } from "lucide-react";
+import { LayoutDashboard, Users, Globe, ChevronLeft, ChevronRight, Terminal, BrainCircuit, BookOpen, Settings, User, MessageSquare, Plug, BookHeart } from "lucide-react";
 import { GolemProvider, useGolem } from "@/components/GolemContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BootScreen } from "@/components/BootScreen";
@@ -22,6 +22,7 @@ function DashboardSidebar({
     const navItems = [
         { name: "直接交談", href: "/dashboard/chat", icon: MessageSquare },
         { name: "技能說明書", href: "/dashboard/skills", icon: BookOpen },
+        { name: "羈絆日記", href: "/dashboard/diary", icon: BookHeart },
         { name: "MCP 工具", href: "/dashboard/mcp", icon: Plug },
         { name: "人格設定", href: "/dashboard/persona", icon: User },
         { name: "Agent 會議室", href: "/dashboard/agents", icon: Users },
@@ -81,14 +82,14 @@ function DashboardSidebar({
             )}>
                 {isSidebarOpen ? (
                     <div className="relative flex p-1 bg-secondary/80 rounded-xl border border-border shadow-inner">
-                        <div 
+                        <div
                             className={cn(
                                 "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-background border border-border shadow-md rounded-lg transition-all duration-300 ease-out",
                                 isTerminal ? "translate-x-full" : "translate-x-0"
                             )}
                         />
-                        <Link 
-                            href="/dashboard" 
+                        <Link
+                            href="/dashboard"
                             className={cn(
                                 "relative flex-1 py-1.5 text-[11px] font-bold text-center z-10 rounded-lg transition-colors flex flex-col items-center justify-center",
                                 isTactical ? "text-primary" : "text-muted-foreground hover:text-foreground"
@@ -97,8 +98,8 @@ function DashboardSidebar({
                             <LayoutDashboard className="w-3.5 h-3.5 mb-1" />
                             戰術控制台
                         </Link>
-                        <Link 
-                            href="/dashboard/terminal" 
+                        <Link
+                            href="/dashboard/terminal"
                             className={cn(
                                 "relative flex-1 py-1.5 text-[11px] font-bold text-center z-10 rounded-lg transition-colors flex flex-col items-center justify-center",
                                 isTerminal ? "text-primary" : "text-muted-foreground hover:text-foreground"
@@ -110,7 +111,7 @@ function DashboardSidebar({
                     </div>
                 ) : (
                     <div className="flex flex-col gap-2 items-center">
-                        <Link 
+                        <Link
                             href="/dashboard"
                             title="戰術控制台"
                             className={cn(
@@ -120,7 +121,7 @@ function DashboardSidebar({
                         >
                             <LayoutDashboard className="w-5 h-5" />
                         </Link>
-                        <Link 
+                        <Link
                             href="/dashboard/terminal"
                             title="終端機控制台"
                             className={cn(

@@ -102,6 +102,15 @@ System configuration and status monitoring:
 | `GET /api/system/security/events` | Read security audit events |
 | `GET /api/golems` | Get Golem list |
 | `POST /api/chat` | Send a web chat message to Golem |
+| `GET /api/diary` | Read diary timeline (with rotation metadata) |
+| `POST /api/diary/rotate` | Force diary rotation (7-day raw retention + weekly/monthly/yearly summaries) |
+| `GET /api/diary/rotation/history` | Read diary rotation history |
+| `GET /api/diary/backups` | List available diary SQLite backups |
+| `GET /api/diary/backup/download?file=...` | Download a specific diary SQLite backup |
+| `POST /api/diary/backup` | Create a diary SQLite backup |
+| `POST /api/diary/backup/cleanup` | Trigger immediate cleanup for old diary backups |
+| `GET /api/diary/restore/preview?file=...` | Preview restore diff/risk before restore |
+| `POST /api/diary/restore` | Restore diary SQLite from a selected backup |
 | `GET /api/skills/export` | Export full skill book or a specific skill |
 | `POST /api/skills/import` | Import skill book from JSON/Markdown |
 | `GET /api/memory` | Read memory entries |
@@ -117,6 +126,19 @@ System configuration and status monitoring:
 - Sensitive operations (restart/shutdown, MCP write, skill/memory mutations) are protected by operation guards.
 - If `SYSTEM_OP_TOKEN` is set, sensitive operations additionally require `x-system-op-token`.
 - Uploads and attachment paths are validated with size and directory-boundary checks.
+
+### Diary Rotation Policy (Recommended)
+
+You can tune these in `.env`:
+
+- `DIARY_RAW_RETENTION_DAYS` (minimum 7)
+- `DIARY_WEEKLY_RETENTION_DAYS`
+- `DIARY_MONTHLY_RETENTION_DAYS`
+- `DIARY_ROTATE_MIN_INTERVAL_MS`
+- `DIARY_BACKUP_MAX_FILES`
+- `DIARY_BACKUP_RETENTION_DAYS`
+
+Diary storage now uses SQLite (WAL). Legacy `diary-book.json` is auto-migrated on first access.
 
 ---
 

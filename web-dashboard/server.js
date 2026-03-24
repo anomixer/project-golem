@@ -19,6 +19,7 @@ const registerPersonaRoutes = require('./routes/api.persona');
 const registerGolemRoutes = require('./routes/api.golems');
 const registerMemoryRoutes = require('./routes/api.memory');
 const registerMcpRoutes = require('./routes/api.mcp');
+const registerDiaryRoutes = require('./routes/api.diary');
 
 class WebServer {
     constructor(dashboard) {
@@ -168,6 +169,7 @@ class WebServer {
             registerGolemRoutes,
             registerMemoryRoutes,
             registerMcpRoutes,
+            registerDiaryRoutes,
         ];
 
         routeFactories.forEach((factory) => {

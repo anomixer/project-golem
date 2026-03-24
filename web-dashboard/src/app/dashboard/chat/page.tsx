@@ -63,6 +63,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
+function extractGolemReplyOnly(rawText: string): string {
+    const text = String(rawText || "").trim();
+    if (!text) return "";
+
+    const cleaned = text.replace(/^🤖\s*\[Golem\]\s*說:\s*/i, "").trim();
+    const hasTitanTags = /\[GOLEM_(MEMORY|ACTION|REPLY)\]/i.test(cleaned);
+    const replyMatch = cleaned.match(/\[GOLEM_REPLY\]([\s\S]*?)(?=\[\/?GOLEM_[A-Z]+\]|$)/i);
+
+    if (replyMatch && replyMatch[1]) {
+        return replyMatch[1].trim();
+    }
+
+    if (hasTitanTags) {
+        return "";
+    }
+
+    return cleaned;
+}
+
 export default function DirectChatPage() {
     const { activeGolem } = useGolem();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -125,6 +144,11 @@ export default function DirectChatPage() {
                     isSystem = !(sender === 'User' || sender === 'WebUser');
                 }
 
+                if (!isThinkingMessage && isSystem) {
+                    content = extractGolemReplyOnly(content);
+                    if (!content) return;
+                }
+
                 setMessages((prev) => {
                     let filtered = prev;
                     if (!isThinkingMessage && (sender !== 'User' && sender !== 'WebUser')) {
@@ -174,18 +198,27 @@ export default function DirectChatPage() {
                             sender = match[1];
                             content = match[2] || " ";
                         }
+
+                        const isSystem = !(sender === 'User' || sender === 'WebUser');
+                        if (isSystem) {
+                            content = extractGolemReplyOnly(content);
+                        }
+
                         return {
                             id: h.time + Math.random().toString(),
                             sender,
                             content,
                             timestamp: h.time,
-                            isSystem: !(sender === 'User' || sender === 'WebUser'),
+                            isSystem,
                             actionData: h.actionData,
                             isHistory: true,
                             attachments: h.attachments
                                 ? h.attachments
                                 : (h.attachment ? [h.attachment] : undefined)
                         };
+                    }).filter((item) => {
+                        if (!item.isSystem) return true;
+                        return Boolean(item.content && item.content.trim());
                     });
 
                     setMessages(parsedHistory);

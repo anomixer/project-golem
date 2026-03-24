@@ -20,6 +20,8 @@ const EDITABLE_KEYS = new Set([
     "GOLEM_SLEEP_START", "GOLEM_SLEEP_END", "USER_INTERESTS", "COMMAND_WHITELIST", "CUSTOM_COMMANDS",
     "ENABLE_LOG_NOTIFICATIONS", "ARCHIVE_CHECK_INTERVAL", "ARCHIVE_THRESHOLD_YESTERDAY", "ARCHIVE_THRESHOLD_TODAY",
     "LOG_MAX_SIZE_MB", "LOG_RETENTION_DAYS", "ENABLE_SYSTEM_LOG", "GOLEM_BACKEND", "GOLEM_STRICT_SAFEGUARD",
+    "DIARY_RAW_RETENTION_DAYS", "DIARY_WEEKLY_RETENTION_DAYS", "DIARY_MONTHLY_RETENTION_DAYS", "DIARY_ROTATE_MIN_INTERVAL_MS",
+    "DIARY_BACKUP_MAX_FILES", "DIARY_BACKUP_RETENTION_DAYS",
     "GOLEM_INTERVENTION_LEVEL", "GOLEM_MAX_AUTO_TURNS", "GOLEM_MAX_RESPONSE_WORDS",
     "TG_ENGINE", "CB_TG_TIMEOUT_MS", "CB_TG_RESET_MS", "CB_TG_ERROR_PCT"
 ]);
@@ -162,6 +164,62 @@ export default function AdvancedTab({ env, logInfo, onChangeEnv }: AdvancedTabPr
                                 placeholder="20"
                                 value={env.ARCHIVE_THRESHOLD_TODAY || ""}
                                 onChange={(val) => onChangeEnv("ARCHIVE_THRESHOLD_TODAY", val)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-secondary/30 p-5 rounded-xl border border-border">
+                        <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4 text-rose-300" /> 日記 Rotate 策略
+                        </h4>
+                        <div className="space-y-4">
+                            <SettingField
+                                label="原始日記保留天數"
+                                keyName="DIARY_RAW_RETENTION_DAYS"
+                                desc="最少建議 7 天，超過會進入週摘要"
+                                placeholder="7"
+                                value={env.DIARY_RAW_RETENTION_DAYS || ""}
+                                onChange={(val) => onChangeEnv("DIARY_RAW_RETENTION_DAYS", val)}
+                            />
+                            <SettingField
+                                label="週摘要保留天數"
+                                keyName="DIARY_WEEKLY_RETENTION_DAYS"
+                                desc="超過且已完成月摘要後，週摘要可被清理"
+                                placeholder="365"
+                                value={env.DIARY_WEEKLY_RETENTION_DAYS || ""}
+                                onChange={(val) => onChangeEnv("DIARY_WEEKLY_RETENTION_DAYS", val)}
+                            />
+                            <SettingField
+                                label="月摘要保留天數"
+                                keyName="DIARY_MONTHLY_RETENTION_DAYS"
+                                desc="超過且已完成年摘要後，月摘要可被清理"
+                                placeholder="1825"
+                                value={env.DIARY_MONTHLY_RETENTION_DAYS || ""}
+                                onChange={(val) => onChangeEnv("DIARY_MONTHLY_RETENTION_DAYS", val)}
+                            />
+                            <SettingField
+                                label="Rotate 最小間隔 (ms)"
+                                keyName="DIARY_ROTATE_MIN_INTERVAL_MS"
+                                desc="避免每次查詢都重複執行 rotate"
+                                placeholder="300000"
+                                value={env.DIARY_ROTATE_MIN_INTERVAL_MS || ""}
+                                onChange={(val) => onChangeEnv("DIARY_ROTATE_MIN_INTERVAL_MS", val)}
+                            />
+                            <SettingField
+                                label="備份最大保留份數"
+                                keyName="DIARY_BACKUP_MAX_FILES"
+                                desc="超過此數量會自動清理最舊備份"
+                                placeholder="120"
+                                value={env.DIARY_BACKUP_MAX_FILES || ""}
+                                onChange={(val) => onChangeEnv("DIARY_BACKUP_MAX_FILES", val)}
+                            />
+                            <SettingField
+                                label="備份保留天數"
+                                keyName="DIARY_BACKUP_RETENTION_DAYS"
+                                desc="超過此天數的備份會自動清理"
+                                placeholder="180"
+                                value={env.DIARY_BACKUP_RETENTION_DAYS || ""}
+                                onChange={(val) => onChangeEnv("DIARY_BACKUP_RETENTION_DAYS", val)}
                             />
                         </div>
                     </div>
