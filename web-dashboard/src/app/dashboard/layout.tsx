@@ -11,6 +11,7 @@ import { BootScreen } from "@/components/BootScreen";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { OpsStyleSwitcher } from "@/components/OpsStyleSwitcher";
 import { useI18n } from "@/components/I18nProvider";
+import GlobalAutoDiaryBell from "./components/GlobalAutoDiaryBell";
 
 const SIDEBAR_NAV_ORDER_STORAGE_KEY = "golem-sidebar-nav-order-v1";
 
@@ -432,7 +433,8 @@ function DashboardContent({
             {/* Main Content */}
             <main className="enterprise-shell flex-1 overflow-auto bg-background flex flex-col h-screen relative">
                 <BootScreen isBooting={isBooting} />
-                <div className="relative z-10 flex-1">
+                <GlobalAutoDiaryBell hidden={shouldHideSidebar} />
+                <div className="relative z-10 flex-1 min-h-0 overflow-hidden flex flex-col">
                     {children}
                 </div>
             </main>
