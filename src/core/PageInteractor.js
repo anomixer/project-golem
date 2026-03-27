@@ -484,10 +484,13 @@ class PageInteractor {
      */
     async _waitForReady(sendSelector) {
         console.log("🔍 [PageInteractor] 正在檢查頁面空閒狀態...");
-        const maxWait = 15000; // 最多等 15 秒
+        const ConfigManager = require('../config');
+        const maxWait = ConfigManager.CONFIG.BROWSER_WAIT_MS || 15000;
+        const isThinkingMode = ConfigManager.CONFIG.GEMINI_MODEL === 'thinking';
+        const effectiveWait = isThinkingMode ? Math.max(maxWait, 120000) : maxWait;
         const startTime = Date.now();
 
-        while (Date.now() - startTime < maxWait) {
+        while (Date.now() - startTime < effectiveWait) {
             const isBusy = await this.page.evaluate(() => {
                 // 尋找「停止」按鈕或特定的正在處理標記
                 const stopButtons = Array.from(document.querySelectorAll('button, [role="button"], [data-test-id*="stop"], .stop-button, [aria-label*="stop" i]'))

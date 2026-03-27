@@ -6,6 +6,7 @@ const ConfigManager = require('../config');
 const DOMDoctor = require('../services/DOMDoctor');
 const OllamaClient = require('../services/OllamaClient');
 const { LanceDBProDriver, SystemNativeDriver } = require('../../packages/memory');
+const ErrorLedger = require('../utils/ErrorLedger');
 
 const BrowserLauncher = require('./BrowserLauncher');
 const { ProtocolFormatter } = require('../../packages/protocol');
@@ -60,6 +61,7 @@ class GolemBrain {
             golemId: this.golemId,
             logDir: options.logDir || ConfigManager.LOG_BASE_DIR
         });
+        this.errorLedger = new ErrorLedger(this.chatLogManager);
 
         // ── Backend Selection ──
         this.backend = ConfigManager.CONFIG.GOLEM_BACKEND || 'gemini';
@@ -349,6 +351,9 @@ class GolemBrain {
                 payload, this.selectors, isSystem, startTag, endTag, 0, attachment
             );
         } catch (e) {
+            if (e.message && e.message.includes('TIMEOUT')) {
+                if (this.errorLedger) this.errorLedger.log('TIMEOUT', e.message);
+            }
             // 處理 selector 修復觸發的重試
             if (e.message && e.message.startsWith('SELECTOR_HEALED:')) {
                 const [, type, newSelector] = e.message.split(':');
@@ -433,7 +438,21 @@ class GolemBrain {
     async recall(queryText) {
         if (!queryText) return [];
         await this._ensureBrowserHealth();
-        try { return await this.memoryDriver.recall(queryText); } catch (e) { return []; }
+        try {
+            const semanticResults = await this.memoryDriver.recall(queryText) || [];
+            let keywordResults = [];
+            if (typeof this.memoryDriver.keywordSearch === 'function') {
+                keywordResults = await this.memoryDriver.keywordSearch(queryText) || [];
+            }
+            
+            const map = new Map();
+            [...semanticResults, ...keywordResults].forEach(item => {
+                if (!map.has(item.text)) {
+                    map.set(item.text, item);
+                }
+            });
+            return Array.from(map.values()).slice(0, 5);
+        } catch (e) { return []; }
     }
 
     /**
@@ -569,7 +588,13 @@ class GolemBrain {
         await this.sendMessage(compressedPrompt, false); // ⚡ 改為 false：等待完整回應
         console.log(`📡 [Brain] 階段一：底層協議注入完成 (${this.backend.toUpperCase()})。`);
 
-        // 🧠 [第二階段] 金字塔式多層記憶注入
+        // 🧠 [第二階段] 非同步漸進式多層記憶注入 (不阻塞啟動)
+        this._injectHistoricalMemoryAsync().catch(e => 
+            console.warn(`⚠️ [Brain] 背景記憶注入失敗 (不影響主功能): ${e.message}`)
+        );
+    }
+
+    async _injectHistoricalMemoryAsync() {
         if (this.chatLogManager) {
             try {
                 let historicalMemory = "";
@@ -726,6 +751,7 @@ class GolemBrain {
         } // Close if (!forceRestart)
 
         if (!isHealthy) {
+            if (this.errorLedger) this.errorLedger.log('BROWSER_CRASH', '偵測到失效狀態或強制重啟');
             console.warn(`🩹 [Brain] 偵測到失效狀態或強制重啟 (forceRestart=${forceRestart})，正在執行物理清理並重新初始化...`);
             // 清理舊實體 (確保清理乾淨，防止殘留 Lock)
             try {
