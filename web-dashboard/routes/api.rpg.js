@@ -1,4 +1,5 @@
 const express = require('express');
+const { normalizeRpgOutput } = require('./lib/rpgOutputNormalizer');
 
 function extractPrompt(body) {
     if (!body) return '';
@@ -61,7 +62,7 @@ module.exports = function registerRpgRoutes(server) {
             }
 
             const text = await generateWithBrain(brain, prompt);
-            const output = String(text || '').trim();
+            const output = normalizeRpgOutput(text);
             if (!output) {
                 return res.status(502).json({ error: 'Golem returned an empty response.' });
             }
@@ -90,4 +91,8 @@ module.exports = function registerRpgRoutes(server) {
     });
 
     return router;
+};
+
+module.exports._private = {
+    normalizeRpgOutput,
 };

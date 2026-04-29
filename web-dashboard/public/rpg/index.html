@@ -3275,21 +3275,54 @@ pendingCombatEncounter = data.pendingCombatEncounter || null;
 }
 function parseAIResponse(responseText) {
     try {
-        const jsonBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
+        const cleanResponseText = stripGolemProtocol(responseText);
+        const jsonBlockMatch = cleanResponseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
         if (jsonBlockMatch) {
             return JSON.parse(jsonBlockMatch[1]);
         }
         
-        const objectMatch = responseText.match(/\{[\s\S]*\}/);
+        const objectMatch = cleanResponseText.match(/\{[\s\S]*\}/);
         if (objectMatch) {
             return JSON.parse(objectMatch[0]);
         }
 
-        return JSON.parse(responseText);
+        return JSON.parse(cleanResponseText);
     } catch (e) {
         console.error("JSON Parse Error:", e, "\nRaw Text:", responseText);
         throw new Error(i18nData[currentLang]['error.parseJSON']);
     }
+}
+
+function stripGolemProtocol(responseText) {
+    let text = String(responseText || '')
+        .replace(/\[\[BEGIN:[^\]]+\]\]/gi, '')
+        .replace(/\[\[END:[^\]]+\]\]/gi, '')
+        .trim();
+
+    const replyMatch = text.match(/\[GOLEM_REPLY\]([\s\S]*?)(?=\[GOLEM_[A-Z]+\]|$)/i);
+    if (replyMatch) {
+        text = replyMatch[1].trim();
+    }
+
+    return text
+        .replace(/\[GOLEM_MEMORY\][\s\S]*?(?=\[GOLEM_ACTION\]|\[GOLEM_REPLY\]|$)/gi, '')
+        .replace(/\[GOLEM_ACTION\][\s\S]*?(?=\[GOLEM_REPLY\]|$)/gi, '')
+        .replace(/\[GOLEM_REPLY\]/gi, '')
+        .trim();
+}
+
+function extractJsonArray(responseText) {
+    const cleanResponseText = stripGolemProtocol(responseText);
+    const fencedMatch = cleanResponseText.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/i);
+    if (fencedMatch) return fencedMatch[1];
+
+    const start = cleanResponseText.indexOf('[');
+    const end = cleanResponseText.lastIndexOf(']');
+    if (start !== -1 && end > start) {
+        return cleanResponseText.slice(start, end + 1);
+    }
+
+    return '';
 }
 
 // ✅ 修改後的 callTextAPI (報錯時顯示 Key 編號)
@@ -6475,10 +6508,10 @@ GENERATE THE JSON ARRAY NOW.`;
         const content = result.candidates[0]?.content?.parts[0]?.text;
 
         // 7. 解析回應 (修復了此處的變數重複宣告問題)
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) throw new Error("無法解析 AI 回傳的劇本格式");
+        const jsonArrayText = extractJsonArray(content);
+        if (!jsonArrayText) throw new Error("無法解析 AI 回傳的劇本格式");
 
-        const generatedCartridges = JSON.parse(jsonMatch[0]);
+        const generatedCartridges = JSON.parse(jsonArrayText);
 
         if (!cumulativeCartridges) cumulativeCartridges = [];
         cumulativeCartridges.push(...generatedCartridges);
