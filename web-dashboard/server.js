@@ -106,7 +106,7 @@ class WebServer {
             }
         });
 
-        this.port = process.env.DASHBOARD_PORT || 3000;
+        this.port = Number(process.env.DASHBOARD_PORT || 3000);
         console.log(`📡 [WebServer] Initial port: ${this.port}, Dev Mode: ${process.env.DASHBOARD_DEV_MODE}`);
 
         const isDev = (process.env.DASHBOARD_DEV_MODE || '').trim() === 'true';
@@ -114,7 +114,7 @@ class WebServer {
             console.log('🚧 [WebServer] Dev Mode detected + Port 3000: Automatically shifting backend to 3001.');
             this.port = 3001;
         }
-        console.log(`📡 [WebServer] Final bound port: ${this.port}`);
+        console.log(`📡 [WebServer] Final preferred port: ${this.port}`);
 
         this.contexts = new Map();
         this.golemFactory = null;
@@ -210,29 +210,58 @@ class WebServer {
     }
 
     startServer() {
-        this.server.listen(this.port, '0.0.0.0', () => {
-            const displayPort = process.env.DASHBOARD_DEV_MODE === 'true' ? 3000 : this.port;
-            const url = `http://localhost:${displayPort}/dashboard`;
-            console.log(`🚀 [WebServer] Dashboard running at ${url}`);
+        const preferredPort = Number(this.port) || 3000;
+        const maxAttempts = 10;
 
-            if (!process.env.SKIP_BROWSER) {
-                setTimeout(() => {
-                    const connectedClients = this.io.engine.clientsCount;
-                    if (connectedClients === 0) {
-                        const startCmd = process.platform == 'darwin'
-                            ? 'open'
-                            : process.platform == 'win32'
-                                ? 'start'
-                                : 'xdg-open';
+        const tryListen = (port, attempt = 1) => {
+            const onError = (err) => {
+                this.server.removeListener('listening', onListening);
 
-                        const { exec } = require('child_process');
-                        exec(`${startCmd} ${url}`);
-                    } else {
-                        console.log(`🌐 [WebServer] Existing dashboard tab detected (${connectedClients} connection/s). Skipping auto-open.`);
-                    }
-                }, 1500);
-            }
-        });
+                if (err && err.code === 'EADDRINUSE' && attempt < maxAttempts) {
+                    const nextPort = port + 1;
+                    console.warn(`⚠️ [WebServer] Port ${port} is in use. Trying ${nextPort}...`);
+                    setTimeout(() => tryListen(nextPort, attempt + 1), 100);
+                    return;
+                }
+
+                console.error(`❌ [WebServer] Failed to bind dashboard on port ${port}:`, err.message);
+                throw err;
+            };
+
+            const onListening = () => {
+                this.server.removeListener('error', onError);
+                this.port = port;
+                process.env.DASHBOARD_PORT = String(port);
+                console.log(`📡 [WebServer] Final bound port: ${this.port}`);
+
+                const url = `http://localhost:${this.port}/dashboard`;
+                console.log(`🚀 [WebServer] Dashboard running at ${url}`);
+
+                if (!process.env.SKIP_BROWSER) {
+                    setTimeout(() => {
+                        const connectedClients = this.io.engine.clientsCount;
+                        if (connectedClients === 0) {
+                            const startCmd = process.platform == 'darwin'
+                                ? 'open'
+                                : process.platform == 'win32'
+                                    ? 'start'
+                                    : 'xdg-open';
+
+                            const { exec } = require('child_process');
+                            exec(`${startCmd} ${url}`);
+                        } else {
+                            console.log(`🌐 [WebServer] Existing dashboard tab detected (${connectedClients} connection/s). Skipping auto-open.`);
+                        }
+                    }, 1500);
+                }
+            };
+
+            this.server.once('error', onError);
+            this.server.once('listening', onListening);
+            this.server.listen(port, '0.0.0.0');
+        };
+
+        tryListen(preferredPort);
     }
 
     broadcastLog(data) {

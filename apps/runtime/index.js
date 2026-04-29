@@ -47,8 +47,7 @@ SystemLogger.init(ConfigManager.LOG_BASE_DIR);
 // Dashboard 強制啟用
 try {
     require('../../dashboard');
-    const displayPort = process.env.DASHBOARD_DEV_MODE === 'true' ? 3000 : (process.env.DASHBOARD_PORT || 3000);
-    console.log('✅ Golem Web Dashboard 已啟動 → http://localhost:' + displayPort);
+    console.log('✅ Golem Web Dashboard 啟動流程已送出，實際網址請以 WebServer running log 為準。');
 } catch (e) {
     console.error('❌ 無法載入 Dashboard:', e.message);
 }
