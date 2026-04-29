@@ -217,6 +217,20 @@ function trackPromptShortcutUsage(shortcut, source = 'telegram') {
     });
 }
 
+async function startActiveTelegramPolling(golemId, reason = 'runtime') {
+    if (!activeTgBot || typeof activeTgBot.startPolling !== 'function') return false;
+    if (typeof activeTgBot.isPolling === 'function' && activeTgBot.isPolling()) return false;
+
+    try {
+        await activeTgBot.startPolling({ restart: true });
+        console.log(`✅ [Bot] ${golemId} Telegram Polling 已啟動 (${reason})。`);
+        return true;
+    } catch (botErr) {
+        console.warn(`⚠️ [Bot] ${golemId} Telegram Polling 啟動失敗 (${reason}): ${botErr.message}`);
+        return false;
+    }
+}
+
 // ==========================================
 // 🧠 雙子管弦樂團 (Golem Orchestrator)
 // ==========================================
@@ -483,11 +497,14 @@ function getOrCreateGolem() {
 
             if (fs_sync.existsSync(personaPath)) {
                 instance.brain.status = 'running';
-                // ✅ [Fix] 確保在 polling 前 brain.init() 已經準備完畢
-                await instance.brain.init();
-                if (activeTgBot && activeTgBot.isPolling && !activeTgBot.isPolling()) {
-                    activeTgBot.startPolling({ restart: true });
-                    console.log(`✅ [Bot] ${golemConfig.id} Telegram Polling 已啟動。`);
+                try {
+                    // ✅ [Fix] 優先初始化大腦；若瀏覽器/Gemini 卡住，也不能讓 Telegram 永久沉默
+                    await instance.brain.init();
+                } catch (initErr) {
+                    instance.brain.status = 'error';
+                    console.error(`❌ [Factory] ${golemConfig.id} Golem 初始化失敗，Telegram 將保持接收訊息:`, initErr.message);
+                } finally {
+                    await startActiveTelegramPolling(golemConfig.id, 'factory');
                 }
             } else {
                 instance.brain.status = 'pending_setup';

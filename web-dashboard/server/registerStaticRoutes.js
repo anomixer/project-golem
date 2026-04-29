@@ -5,9 +5,16 @@ const path = require('path');
 module.exports = function registerStaticRoutes(server) {
     const projectRoot = path.resolve(__dirname, '../..');
     const uploadDir = path.join(projectRoot, 'data', 'temp_uploads');
+    const rpgPublicPath = path.join(__dirname, '..', 'public', 'rpg');
 
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
     server.app.use('/api/files', express.static(uploadDir));
+    server.app.use('/rpg', express.static(rpgPublicPath, {
+        extensions: ['html'],
+        setHeaders: (res) => {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        }
+    }));
 
     server.app.get('/api/files-debug', (req, res) => {
         if (fs.existsSync(uploadDir)) {
@@ -51,6 +58,30 @@ module.exports = function registerStaticRoutes(server) {
 
     server.app.get('/', (req, res) => {
         res.redirect('/dashboard');
+    });
+
+    server.app.get('/dashboard/rpg', (req, res) => {
+        res.status(200).send(`<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Golem Text RPG</title>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; background: #0a0a0a; overflow: hidden; }
+    .bar { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; box-sizing: border-box; color: #e5e7eb; background: #111827; border-bottom: 1px solid #263244; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .bar a { color: #93c5fd; text-decoration: none; font-size: 13px; }
+    iframe { width: 100%; height: calc(100% - 44px); border: 0; background: #000; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <strong>文字 RPG</strong>
+    <a href="/rpg/index.html" target="_blank" rel="noreferrer">新視窗開啟</a>
+  </div>
+  <iframe title="Golem Text RPG" src="/rpg/index.html" allow="clipboard-read; clipboard-write"></iframe>
+</body>
+</html>`);
     });
 
     const dashboardRoutes = [

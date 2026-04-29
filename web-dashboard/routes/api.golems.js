@@ -5,6 +5,19 @@ module.exports = function registerGolemRoutes(server) {
     const router = express.Router();
     const requireGolemOps = buildOperationGuard(server, 'golem_admin_operation');
 
+    async function startTelegramPollingIfAvailable(instance, golemId, reason) {
+        const bot = instance && instance.brain && instance.brain.tgBot;
+        if (!bot || typeof bot.startPolling !== 'function') return;
+        if (typeof bot.isPolling === 'function' && bot.isPolling()) return;
+
+        try {
+            await bot.startPolling({ restart: true });
+            console.log(`🤖 [Bot] ${golemId} Telegram polling started (${reason}).`);
+        } catch (botErr) {
+            console.warn(`⚠️ [Bot] ${golemId} Polling failed (${reason}):`, botErr.message);
+        }
+    }
+
     router.get('/api/golems', (req, res) => {
         try {
             const EnvManager = require('../../src/utils/EnvManager');
@@ -134,19 +147,16 @@ module.exports = function registerGolemRoutes(server) {
             console.log(`🎬 [WebServer] Explicitly starting Golem: ${id}`);
             server.isBooting = true;
             try {
-                await instance.brain.init();
-                instance.brain.status = 'running';
-            } finally {
-                server.isBooting = false;
-            }
-
-            if (instance.brain.tgBot && typeof instance.brain.tgBot.startPolling === 'function') {
                 try {
-                    await instance.brain.tgBot.startPolling();
-                    console.log(`🤖 [Bot] ${id} Telegram polling started.`);
-                } catch (botErr) {
-                    console.warn(`⚠️ [Bot] ${id} Polling failed:`, botErr.message);
+                    await instance.brain.init();
+                    instance.brain.status = 'running';
+                } catch (initErr) {
+                    instance.brain.status = 'error';
+                    console.error(`[WebServer] Golem '${id}' brain init failed; keeping Telegram polling alive:`, initErr.message);
                 }
+            } finally {
+                await startTelegramPollingIfAvailable(instance, id, 'manual_start');
+                server.isBooting = false;
             }
 
             if (instance.autonomy && typeof instance.autonomy.start === 'function') {
@@ -227,19 +237,17 @@ module.exports = function registerGolemRoutes(server) {
 
             (async () => {
                 try {
-                    await context.brain.init();
-
-                    if (context.brain.tgBot && typeof context.brain.tgBot.startPolling === 'function') {
-                        await context.brain.tgBot.startPolling();
-                        console.log(`🤖 [Bot] ${golemId} started polling after setup.`);
+                    try {
+                        await context.brain.init();
+                    } catch (err) {
+                        console.error(`Failed to initialize Golem [${golemId}] after setup; keeping Telegram polling alive:`, err);
+                        context.brain.status = 'error';
                     }
+                    await startTelegramPollingIfAvailable(context, golemId, 'setup');
 
                     if (context.autonomy && typeof context.autonomy.start === 'function') {
                         context.autonomy.start();
                     }
-                } catch (err) {
-                    console.error(`Failed to initialize Golem [${golemId}] after setup:`, err);
-                    context.brain.status = 'error';
                 } finally {
                     server.isBooting = false;
                     console.log(`✅ [WebServer] Setup complete for ${golemId}. Dashboard is ready.`);

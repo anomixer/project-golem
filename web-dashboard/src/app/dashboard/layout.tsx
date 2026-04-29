@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Globe, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, GripVertical, Terminal, BrainCircuit, BookOpen, Settings, User, MessageSquare, Plug, BookHeart, Library, Activity } from "lucide-react";
+import { LayoutDashboard, Users, Globe, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, GripVertical, Terminal, BrainCircuit, BookOpen, Settings, User, MessageSquare, Plug, BookHeart, Library, Activity, Gamepad2 } from "lucide-react";
 import { GolemProvider, useGolem } from "@/components/GolemContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BootScreen } from "@/components/BootScreen";
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
     { labelKey: "sidebar.nav.persona", href: "/dashboard/persona", icon: User },
     { labelKey: "sidebar.nav.promptPool", href: "/dashboard/prompt-pool", icon: Library },
     { labelKey: "sidebar.nav.promptTrends", href: "/dashboard/prompt-trends", icon: Activity },
+    { labelKey: "sidebar.nav.rpg", href: "/dashboard/rpg", icon: Gamepad2 },
     { labelKey: "sidebar.nav.skills", href: "/dashboard/skills", icon: BookOpen },
     { labelKey: "sidebar.nav.mcp", href: "/dashboard/mcp", icon: Plug },
     { labelKey: "sidebar.nav.agents", href: "/dashboard/agents", icon: Users },

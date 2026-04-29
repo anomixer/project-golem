@@ -21,6 +21,7 @@ const registerMemoryRoutes = require('./routes/api.memory');
 const registerMcpRoutes = require('./routes/api.mcp');
 const registerDiaryRoutes = require('./routes/api.diary');
 const registerPromptPoolRoutes = require('./routes/api.prompt-pool');
+const registerRpgRoutes = require('./routes/api.rpg');
 
 class WebServer {
     constructor(dashboard) {
@@ -62,10 +63,35 @@ class WebServer {
         this.server.timeout = 300000;
 
         this.app.use((req, res, next) => {
-            const connectSrc = this.allowRemote
-                ? "default-src 'self'; connect-src * ws: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: *;"
-                : "default-src 'self'; connect-src 'self' ws: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: *;";
-            res.setHeader('Content-Security-Policy', connectSrc);
+            const rpgSources = [
+                'https://cdn.tailwindcss.com',
+                'https://unpkg.com',
+                'https://cdnjs.cloudflare.com',
+                'https://www.gstatic.com',
+                'https://fonts.googleapis.com',
+                'https://fonts.gstatic.com',
+            ].join(' ');
+            const rpgConnectSources = [
+                'https://www.googleapis.com',
+                'https://firebaseinstallations.googleapis.com',
+                'https://identitytoolkit.googleapis.com',
+                'https://firestore.googleapis.com',
+                'https://securetoken.googleapis.com',
+                'https://*.googleapis.com',
+            ].join(' ');
+            const connectSrc = this.allowRemote ? '* ws: wss:' : `'self' ws: wss: ${rpgConnectSources}`;
+            res.setHeader(
+                'Content-Security-Policy',
+                [
+                    "default-src 'self'",
+                    `connect-src ${connectSrc}`,
+                    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${rpgSources}`,
+                    `style-src 'self' 'unsafe-inline' ${rpgSources}`,
+                    `font-src 'self' data: ${rpgSources}`,
+                    "img-src 'self' data: blob: *",
+                    "frame-src 'self'",
+                ].join('; ') + ';'
+            );
             next();
         });
 
@@ -172,6 +198,7 @@ class WebServer {
             registerMcpRoutes,
             registerDiaryRoutes,
             registerPromptPoolRoutes,
+            registerRpgRoutes,
         ];
 
         routeFactories.forEach((factory) => {
