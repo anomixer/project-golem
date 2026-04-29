@@ -766,15 +766,17 @@ function applyShopPriceRules(shopData) {
 }
 
 
-function calculateMonsterStats(rankTag, playerState) {
+function calculateMonsterStats(rankTag, playerState = {}) {
     const rankKey = (rankTag || 'NORMAL').toUpperCase();
     const config = MONSTER_RANKS[rankKey] || MONSTER_RANKS['NORMAL'];
     
     // 1. 取得玩家數據
-    const pStats = calculatePlayerStats(playerState.player_status);
+    const playerStatus = playerState.player_status || {};
+    const pStats = calculatePlayerStats(playerStatus);
     const pAtk = pStats.derived.atk;
     const pDef = pStats.derived.def;
-    const pMaxHp = playerState.player_status.status_bars.find(b => b.type === 'hp')?.max_value || 100;
+    const statusBars = Array.isArray(playerStatus.status_bars) ? playerStatus.status_bars : [];
+    const pMaxHp = statusBars.find(b => b.type === 'hp')?.max_value || 100;
     const currentScore = playerState.hidden_score || 0;
 
     // 2. 計算積分係數 (Fate Multiplier) - 每 100 分增加 1 倍強度
@@ -789,7 +791,7 @@ function calculateMonsterStats(rankTag, playerState) {
     const finalAtk = Math.floor(pDef + (pMaxHp * config.threat));
 
     // 5. 計算經驗值 (XP)
-    const level = playerState.player_status.level || 1;
+    const level = playerStatus.level || 1;
     const finalXp = Math.ceil(10 * level * config.xpMult);
 
     return {
@@ -854,10 +856,11 @@ function recalculateVitals(playerStatus) {
     }
 }
 
-function calculatePlayerStats(status) {
-    const str = (status.attributes && status.attributes.strength) ? status.attributes.strength : 10;
-    const luc = (status.attributes && status.attributes.vitality) ? status.attributes.vitality : 10;
-    const dex = (status.attributes && status.attributes.dexterity) ? status.attributes.dexterity : 10;
+function calculatePlayerStats(status = {}) {
+    const attrs = status.attributes || {};
+    const str = attrs.strength || 10;
+    const luc = attrs.vitality || 10;
+    const dex = attrs.dexterity || 10;
     const level = status.level || 1;
 
     const getGearBonus = (itemName, type) => {
@@ -3707,17 +3710,6 @@ try {
             shopGeneratedAtActionCount = 0;
             console.log("[System] Initial Shop Cache Loaded");
         }
-// [插入] 初始戰鬥數值注入
-if (gameData.start_combat) {
-    const stats = calculateMonsterStats(gameData.start_combat.rank, playerState);
-    gameData.start_combat.hp = stats.hp;
-    gameData.start_combat.maxHp = stats.maxHp;
-    gameData.start_combat.atk = stats.atk;
-    gameData.start_combat.def = stats.def;
-    gameData.start_combat.xp_reward = stats.xp;
-pendingCombatEncounter = gameData.start_combat;
-    console.log(`[System] Monster Generated: ${gameData.start_combat.name} (${stats.rank}) HP:${stats.hp}`);
-}
         if (gameData.player_status && gameData.player_status.status_bars) {
 
             // 1. 取得當前遊戲類型的「詳細體質」屬性名稱清單 (例如: ["魅力", "心機", "氣運", "影響力", "城府"])
@@ -3752,6 +3744,18 @@ pendingCombatEncounter = gameData.start_combat;
             current_stage_index: 0 // 初始化在第 0 階段
         };
         // ▲▲▲ 【新增結束】 ▲▲▲
+
+        // [插入] 初始戰鬥數值注入
+        if (gameData.start_combat) {
+            const stats = calculateMonsterStats(gameData.start_combat.rank, playerState);
+            gameData.start_combat.hp = stats.hp;
+            gameData.start_combat.maxHp = stats.maxHp;
+            gameData.start_combat.atk = stats.atk;
+            gameData.start_combat.def = stats.def;
+            gameData.start_combat.xp_reward = stats.xp;
+            pendingCombatEncounter = gameData.start_combat;
+            console.log(`[System] Monster Generated: ${gameData.start_combat.name} (${stats.rank}) HP:${stats.hp}`);
+        }
 
         time_of_day = gameData.time_of_day || 'day';
         turnsUntilCycleChange = Math.floor(Math.random() * 4) + 7;
