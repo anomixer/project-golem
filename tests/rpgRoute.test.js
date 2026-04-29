@@ -26,4 +26,40 @@ describe('RPG generateContent route helpers', () => {
         expect(output).not.toContain('[GOLEM_REPLY]');
         expect(JSON.parse(output)[0].id).toBe('shadow-of-the-jade-emperor');
     });
+
+    test('normalizeRpgOutput recovers JSON mistakenly emitted as GOLEM_ACTION', () => {
+        const { normalizeRpgOutput } = require('../web-dashboard/routes/lib/rpgOutputNormalizer');
+
+        const raw = `[GOLEM_MEMORY]
+- 已根據背景初始化角色卡。
+[GOLEM_REPLY]
+正在執行相關指令，生成角色數據中...
+[GOLEM_ACTION]
+\`\`\`JSON
+{
+  "name": "青衣無名",
+  "attributes": { "strength": 14, "vitality": 12, "dexterity": 18 },
+  "traits": [{ "name": "青玉共鳴", "logic": "被敵意鎖定時閃避提高。" }],
+  "skills": [{ "name": "踏雪無痕", "type": "active", "cost": "8 SP", "description": "短距離身法。" }],
+  "equipment": { "weapon": "青玉劍 (+5)", "armor": "夜行衣 (+2)", "accessory": "密探令牌 (+1)", "items": ["乾糧"] },
+  "scenario": "你在破廟醒來。"
+}
+\`\`\``;
+
+        const output = normalizeRpgOutput(raw);
+
+        expect(output.trim().startsWith('{')).toBe(true);
+        expect(output).not.toContain('[GOLEM_ACTION]');
+        expect(JSON.parse(output).name).toBe('青衣無名');
+    });
+
+    test('buildRpgPrompt adds a hard boundary against normal chat protocol', () => {
+        const { _private } = require('../web-dashboard/routes/api.rpg');
+
+        const prompt = _private.buildRpgPrompt('Return a character JSON object.');
+
+        expect(prompt).toContain('Text RPG web app');
+        expect(prompt).toContain('Do NOT use Project Golem protocol tags');
+        expect(prompt).toContain('Return a character JSON object.');
+    });
 });

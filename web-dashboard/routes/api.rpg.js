@@ -44,6 +44,20 @@ async function generateWithBrain(brain, prompt) {
     throw new Error('Active Golem brain does not expose a text generation method.');
 }
 
+function buildRpgPrompt(userPrompt) {
+    return `You are currently serving the Project Golem Text RPG web app, not a normal chat session.
+
+RPG OUTPUT BOUNDARY:
+- Do NOT use Project Golem protocol tags: [GOLEM_MEMORY], [GOLEM_ACTION], [GOLEM_REPLY].
+- Do NOT call tools or describe actions being executed.
+- Do NOT write memory notes, status narration, or assistant prefaces.
+- Return only the exact format requested by the RPG prompt below.
+- If the RPG prompt requests JSON, your entire response must be valid JSON only.
+
+RPG PROMPT:
+${userPrompt}`;
+}
+
 module.exports = function registerRpgRoutes(server) {
     const router = express.Router();
 
@@ -61,7 +75,7 @@ module.exports = function registerRpgRoutes(server) {
                 return res.status(503).json({ error: 'No active Golem brain is available.' });
             }
 
-            const text = await generateWithBrain(brain, prompt);
+            const text = await generateWithBrain(brain, buildRpgPrompt(prompt));
             const output = normalizeRpgOutput(text);
             if (!output) {
                 return res.status(502).json({ error: 'Golem returned an empty response.' });
@@ -94,5 +108,6 @@ module.exports = function registerRpgRoutes(server) {
 };
 
 module.exports._private = {
+    buildRpgPrompt,
     normalizeRpgOutput,
 };

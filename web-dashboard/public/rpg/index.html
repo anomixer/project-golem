@@ -3300,8 +3300,16 @@ function stripGolemProtocol(responseText) {
         .trim();
 
     const replyMatch = text.match(/\[GOLEM_REPLY\]([\s\S]*?)(?=\[GOLEM_[A-Z]+\]|$)/i);
-    if (replyMatch) {
-        text = replyMatch[1].trim();
+    const actionMatch = text.match(/\[GOLEM_ACTION\]([\s\S]*?)(?=\[GOLEM_[A-Z]+\]|$)/i);
+    const replyText = replyMatch ? replyMatch[1].trim() : '';
+    const actionText = actionMatch ? actionMatch[1].trim() : '';
+
+    if (looksLikeJsonPayload(replyText)) {
+        text = replyText;
+    } else if (looksLikeJsonPayload(actionText)) {
+        text = actionText;
+    } else if (replyText) {
+        text = replyText;
     }
 
     return text
@@ -3309,6 +3317,14 @@ function stripGolemProtocol(responseText) {
         .replace(/\[GOLEM_ACTION\][\s\S]*?(?=\[GOLEM_REPLY\]|$)/gi, '')
         .replace(/\[GOLEM_REPLY\]/gi, '')
         .trim();
+}
+
+function looksLikeJsonPayload(text) {
+    const cleaned = String(text || '')
+        .replace(/```(?:json)?\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+    return cleaned.startsWith('{') || cleaned.startsWith('[');
 }
 
 function extractJsonArray(responseText) {
