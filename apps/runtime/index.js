@@ -830,7 +830,8 @@ async function handleUnifiedMessage(ctx, forceTargetId = null) {
 
     await ctx.sendTyping();
     try {
-        let finalInput = ctx.text;
+        const effectiveText = typeof ctx.textOverride === 'string' ? ctx.textOverride : ctx.text;
+        let finalInput = effectiveText;
         const attachment = await ctx.getAttachment();
 
         // ✨ [群組模式身分與回覆注入]
@@ -878,20 +879,20 @@ async function handleUnifiedMessage(ctx, forceTargetId = null) {
             // 如果是原生附加檔案 (由 Web Dashboard 傳入或剛剛下載完成)，則跳過 OpticNerve 分析，直接入隊
             if (attachment.isNative) {
                 console.log("📎 [System] 偵測到原生附件，將直接交由 Golem 處理。");
-                finalInput = senderPrefix + (ctx.text || "");
+                finalInput = senderPrefix + (effectiveText || "");
             } else {
                 await ctx.reply("👁️ 正在透過 OpticNerve 分析檔案...");
                 const apiKey = await brain.doctor.keyChain.getKey();
                 if (apiKey) {
                     const analysis = await OpticNerve.analyze(attachment.url, attachment.mimeType, apiKey);
-                    finalInput = `${senderPrefix}【系統通知：視覺訊號】\n檔案類型：${attachment.mimeType}\n分析報告：\n${analysis}\n使用者訊息：${ctx.text || ""}\n請根據分析報告回應。`;
+                    finalInput = `${senderPrefix}【系統通知：視覺訊號】\n檔案類型：${attachment.mimeType}\n分析報告：\n${analysis}\n使用者訊息：${effectiveText || ""}\n請根據分析報告回應。`;
                 } else {
                     await ctx.reply("⚠️ 視覺系統暫時過熱 (API Rate Limit)，無法分析圖片，將僅處理文字訊息。");
-                    finalInput = senderPrefix + (ctx.text || "");
+                    finalInput = senderPrefix + (effectiveText || "");
                 }
             }
         } else {
-            finalInput = senderPrefix + (ctx.text || "");
+            finalInput = senderPrefix + (effectiveText || "");
         }
 
         if (!finalInput && !attachment) return;

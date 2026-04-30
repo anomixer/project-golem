@@ -22,6 +22,7 @@ const registerMcpRoutes = require('./routes/api.mcp');
 const registerDiaryRoutes = require('./routes/api.diary');
 const registerPromptPoolRoutes = require('./routes/api.prompt-pool');
 const registerRpgRoutes = require('./routes/api.rpg');
+const registerStockRoutes = require('./routes/api.stocks');
 
 class WebServer {
     constructor(dashboard) {
@@ -199,6 +200,7 @@ class WebServer {
             registerDiaryRoutes,
             registerPromptPoolRoutes,
             registerRpgRoutes,
+            registerStockRoutes,
         ];
 
         routeFactories.forEach((factory) => {

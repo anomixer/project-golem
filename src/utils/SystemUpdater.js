@@ -101,15 +101,22 @@ class SystemUpdater {
         }
 
         let remoteVersion = 'Unknown';
+        let remoteVersionError = null;
         try {
             const rawUrl = 'https://raw.githubusercontent.com/Arvincreator/project-golem/main/package.json';
-            const response = await fetch(rawUrl);
+            const response = await fetch(rawUrl, {
+                headers: { 'User-Agent': 'Project-Golem-Updater/1.0' },
+                signal: AbortSignal.timeout(8000)
+            });
             if (response.ok) {
                 const remotePkg = await response.json();
                 remoteVersion = remotePkg.version || 'Unknown';
+            } else {
+                remoteVersionError = `HTTP ${response.status}`;
             }
         } catch (e) {
-            console.error("[SystemUpdater] Failed to fetch remote version", e);
+            remoteVersionError = e && e.message ? e.message : String(e);
+            console.warn(`[SystemUpdater] Remote version unavailable: ${remoteVersionError}`);
         }
 
         const isGit = fs.existsSync(path.join(rootDir, '.git'));
@@ -146,6 +153,7 @@ class SystemUpdater {
         return {
             currentVersion,
             remoteVersion,
+            remoteVersionError,
             isOutdated,
             installMode: isGit ? 'git' : 'zip',
             gitInfo

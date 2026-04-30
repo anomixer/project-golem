@@ -7,6 +7,7 @@ const SkillArchitect = require('../managers/SkillArchitect');
 const wikiSkill = require('../skills/core/wiki');
 const { toolsetManager, SCENE_TOOLSETS } = require('../managers/ToolsetManager');
 const { hookSystem } = require('./HookSystem'); // ⚡ [OpenHarness-inspired]
+const { buildStockSnapshotInjection } = require('../services/StockDashboardSnapshot');
 
 // ✨ [v9.1 Addon] 初始化技能架構師 (Web Gemini Mode)
 // 注意：這裡不傳入 Model，因為我們將在 NodeRouter 中傳入 Web Brain
@@ -208,6 +209,29 @@ class NodeRouter {
         }
 
         if (text.startsWith('/patch') || text.includes('優化代碼')) return false;
+
+        const wantsStockDashboard =
+            /^\/(stocks?|stockboard|stock-dashboard)(\s|$)/i.test(text) ||
+            /(股市|股票|行情).{0,8}(看板|dashboard)/i.test(text) ||
+            /(看板|dashboard).{0,8}(股市|股票|行情)/i.test(text) ||
+            /stock\s+dashboard/i.test(text);
+
+        if (wantsStockDashboard) {
+            const userRequest = text.replace(/^\/(stocks?|stockboard|stock-dashboard)\s*/i, '').trim() || '請分析目前股市看板。';
+            const enrichedText = [
+                userRequest,
+                '',
+                buildStockSnapshotInjection(),
+                '',
+                '請輸出：市場概況、主要強弱標的、技術指標重點、風險提醒、接下來可觀察的價位或事件。不要做保證式投資建議。',
+            ].join('\n');
+            if (typeof ctx.setTextOverride === 'function') {
+                ctx.setTextOverride(enrichedText);
+            } else {
+                ctx.textOverride = enrichedText;
+            }
+            return false;
+        }
 
         // ── /wiki 指令 ───────────────────────────────────────────
         if (text.startsWith('/wiki')) {

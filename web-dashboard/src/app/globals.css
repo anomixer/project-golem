@@ -8,6 +8,9 @@
 /* ===== Light Theme ===== */
 :root,
 :root.light {
+    --font-sans: "Avenir Next", "Segoe UI", "PingFang TC", "Noto Sans TC", "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Avenir Next", "Segoe UI", "PingFang TC", "Noto Sans TC", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "SF Mono", "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
     --background: oklch(0.99 0.005 240);
     --foreground: oklch(0.2 0.015 250);
     --card: oklch(0.995 0.003 240);
