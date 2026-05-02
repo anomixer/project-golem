@@ -156,6 +156,30 @@ module.exports = function registerGolemRoutes(server) {
         return summary;
     }
 
+    function isWindowsPathLockedError(error) {
+        return process.platform === 'win32'
+            && error
+            && (error.code === 'EPERM' || error.code === 'EBUSY')
+            && (error.syscall === 'rename' || error.syscall === 'rmdir' || error.syscall === 'unlink');
+    }
+
+    function buildMemoryReplaceError(error, targetMemoryDir) {
+        if (isWindowsPathLockedError(error)) {
+            return {
+                status: 409,
+                body: {
+                    error: '目前新專案的 golem_memory 正被 Windows 或瀏覽器程序占用，無法替換記憶資料夾。請先關閉 Golem、Dashboard、Chrome/Chromium 視窗後再重試。',
+                    code: error.code,
+                    detail: error.message,
+                    targetPath: targetMemoryDir,
+                    suggestion: '若仍失敗，請重新開機後先不要啟動 Golem，直接執行記憶轉生。',
+                },
+            };
+        }
+
+        return null;
+    }
+
     async function startTelegramPollingIfAvailable(instance, golemId, reason) {
         const bot = instance && instance.brain && instance.brain.tgBot;
         if (!bot || typeof bot.startPolling !== 'function') return;
@@ -403,12 +427,32 @@ module.exports = function registerGolemRoutes(server) {
             let backupPath = null;
             if (fs.existsSync(targetMemoryDir) && !isDirectoryEmpty(targetMemoryDir)) {
                 backupPath = `${targetMemoryDir}.before-reincarnation-${Date.now()}`;
-                fs.renameSync(targetMemoryDir, backupPath);
+                try {
+                    fs.renameSync(targetMemoryDir, backupPath);
+                } catch (error) {
+                    fs.rmSync(tempTargetDir, { recursive: true, force: true });
+                    const friendly = buildMemoryReplaceError(error, targetMemoryDir);
+                    if (friendly) return res.status(friendly.status).json(friendly.body);
+                    throw error;
+                }
             } else if (fs.existsSync(targetMemoryDir)) {
-                fs.rmSync(targetMemoryDir, { recursive: true, force: true });
+                try {
+                    fs.rmSync(targetMemoryDir, { recursive: true, force: true });
+                } catch (error) {
+                    fs.rmSync(tempTargetDir, { recursive: true, force: true });
+                    const friendly = buildMemoryReplaceError(error, targetMemoryDir);
+                    if (friendly) return res.status(friendly.status).json(friendly.body);
+                    throw error;
+                }
             }
 
-            fs.renameSync(tempTargetDir, targetMemoryDir);
+            try {
+                fs.renameSync(tempTargetDir, targetMemoryDir);
+            } catch (error) {
+                const friendly = buildMemoryReplaceError(error, targetMemoryDir);
+                if (friendly) return res.status(friendly.status).json(friendly.body);
+                throw error;
+            }
             console.log(`🧬 [WebServer] Memory reincarnated from ${sourceMemoryDir} to ${targetMemoryDir}`);
 
             return res.json({

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, DragEvent, ClipboardEvent } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, DragEvent, ClipboardEvent, KeyboardEvent } from "react";
 import { useGolem } from "@/components/GolemContext";
 import { socket } from "@/lib/socket";
 import { User, Bot, Send, X, FileText, Paperclip, UploadCloud } from "lucide-react";
@@ -36,6 +36,14 @@ interface CommandItem {
     command: string;
     description: string;
     options?: CommandOption[];
+}
+
+function isImeComposing(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
+    const nativeEvent = event.nativeEvent as KeyboardEvent<HTMLTextAreaElement>["nativeEvent"] & {
+        isComposing?: boolean;
+        keyCode?: number;
+    };
+    return nativeEvent.isComposing === true || nativeEvent.keyCode === 229;
 }
 
 interface PromptShortcutItem {
@@ -874,6 +882,8 @@ export default function DirectChatPage() {
                                 value={input}
                                 onChange={(e) => onInputChange(e.target.value)}
                                 onKeyDown={(e) => {
+                                    if (isImeComposing(e)) return;
+
                                     if (showSuggestions) {
                                         if (filteredCommands.length === 0) {
                                             setShowSuggestions(false);

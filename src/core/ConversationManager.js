@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const ConfigManager = require('../config');
 const ConfidenceTracker = require('../managers/ConfidenceTracker');
+const ReferenceFileService = require('../services/ReferenceFileService');
 
 // ============================================================
 // 🚦 Conversation Manager (隊列與防抖系統 - 多用戶隔離版)
@@ -220,7 +221,16 @@ class ConversationManager {
 
             await task.ctx.sendTyping();
             const memories = await this.brain.recall(task.text);
+            let referenceContext = '';
+            try {
+                referenceContext = ReferenceFileService.buildContext(task.text, { limit: 4, maxChunkChars: 1200 });
+            } catch (error) {
+                console.warn(`[ReferenceFiles] 自動召回失敗: ${error.message}`);
+            }
             let finalInput = task.text;
+            if (referenceContext) {
+                finalInput = `【相關參考文件】\n${referenceContext}\n---\n${finalInput}`;
+            }
             if (memories.length > 0) {
                 finalInput = `【相關記憶】\n${memories.map(m => `• ${m.text}`).join('\n')}\n---\n${finalInput}`;
             }
@@ -269,7 +279,11 @@ class ConversationManager {
 
             await this.NeuroShunter.dispatch(task.ctx, raw, this.brain, this.controller, {
                 suppressReply: shouldSuppressReply || task.options.suppressReply === true,
-                attachments: responseAttachments
+                attachments: responseAttachments,
+                isSystemFeedback: task.options.isSystemFeedback === true,
+                allowActions: task.options.allowActions === true,
+                actionDepth: Number(task.options.actionDepth || 0),
+                maxActionDepth: Number(task.options.maxActionDepth || ConfigManager.CONFIG.MAX_AUTO_TURNS || 5)
             });
         } catch (e) {
             console.error(`❌ [Dialogue Queue:${this.golemId}] 處理失敗:`, e);

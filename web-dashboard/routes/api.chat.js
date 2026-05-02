@@ -237,7 +237,9 @@ module.exports = function(server) {
 
     router.get('/api/commands', (req, res) => {
         try {
-            const commands = require('../../src/config/commands.js');
+            const commandsPath = require.resolve('../../src/config/commands.js');
+            delete require.cache[commandsPath];
+            const commands = require(commandsPath);
             return res.json({ success: true, commands });
         } catch (e) {
             console.error('Failed to fetch commands:', e);

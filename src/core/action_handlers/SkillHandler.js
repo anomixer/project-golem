@@ -2,7 +2,7 @@ const skillManager = require('../../managers/SkillManager');
 const MCPManager   = require('../../mcp/MCPManager');
 
 class SkillHandler {
-    static async execute(ctx, act, brain, controller) {
+    static async execute(ctx, act, brain, controller, dispatchOptions = {}) {
         // ✨ [v9.1] 整合行動產線：將 Observation 放入對話產線
         let convoManager = null;
         if (controller && controller.golemId) {
@@ -18,7 +18,14 @@ class SkillHandler {
         }
 
         const sendFeedback = async (message) => {
-            const feedbackPrompt = `[System Observation]\n${message}\n\nPlease reply to user naturally using [GOLEM_REPLY].`;
+            const feedbackPrompt = `[System Observation]\n` +
+                `以下是上一個工具、技能或 MCP 呼叫的執行結果。\n\n` +
+                `限制：\n` +
+                `- 你現在處於 observation_summary 模式。\n` +
+                `- 請只使用 [GOLEM_REPLY] 整理結果給使用者。\n` +
+                `- 禁止輸出 [GOLEM_ACTION]。\n` +
+                `- 如果你認為必須繼續使用工具，請先說明原因並等待使用者確認。\n\n` +
+                `工具結果：\n${message}`;
             if (convoManager) {
                 const isAuto = process.env.GOLEM_AUTO_APPROVE_ALL === 'true';
                 const isSilent = process.env.GOLEM_SILENT_AUTO_APPROVE === 'true';
@@ -26,6 +33,9 @@ class SkillHandler {
                     isPriority: true, 
                     bypassDebounce: true,
                     isSystemFeedback: true,
+                    allowActions: false,
+                    actionDepth: Number(dispatchOptions.actionDepth || 0) + 1,
+                    maxActionDepth: Number(dispatchOptions.maxActionDepth || process.env.GOLEM_MAX_AUTO_TURNS || 5),
                     suppressReply: isAuto && isSilent
                 };
                 await convoManager.enqueue(ctx, feedbackPrompt, feedbackOptions);

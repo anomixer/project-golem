@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Bot, CheckCircle2, Gauge, HardDrive, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import { SettingField, SettingSelectField } from "../SettingFields";
 import { useI18n } from "@/components/I18nProvider";
+import { cn } from "@/lib/utils";
 
 type SecurityTabProps = {
     env: Record<string, string>;
@@ -51,11 +52,121 @@ const parseCsv = (value?: string): string[] => {
         .filter(Boolean);
 };
 
+const isEnabled = (value?: string): boolean => String(value || "").trim().toLowerCase() === "true";
+const getAutoTurns = (value?: string): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 5;
+};
+
+type AutomationMode = "guided" | "balanced" | "autopilot" | "silent" | "custom";
+
+function inferAutomationMode(env: Record<string, string>): AutomationMode {
+    const autoApprove = isEnabled(env.GOLEM_AUTO_APPROVE_ALL);
+    const silent = isEnabled(env.GOLEM_SILENT_AUTO_APPROVE);
+    const trustLibrary = isEnabled(env.GOLEM_TRUST_SYSTEM_COMMANDS);
+    const maxTurns = getAutoTurns(env.GOLEM_MAX_AUTO_TURNS);
+
+    if (autoApprove && silent) return "silent";
+    if (autoApprove) return "autopilot";
+    if (!autoApprove && trustLibrary && maxTurns >= 2) return "balanced";
+    if (!autoApprove && !silent && maxTurns <= 1) return "guided";
+    return "custom";
+}
+
+function ToggleField({
+    label,
+    desc,
+    value,
+    onChange,
+}: {
+    label: string;
+    desc: string;
+    value: boolean;
+    onChange: (value: boolean) => void;
+}) {
+    return (
+        <div className="rounded-lg border border-border bg-secondary/20 p-3">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <div className="text-sm font-medium text-foreground">{label}</div>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{desc}</p>
+                </div>
+                <div className="flex shrink-0 rounded-lg border border-border bg-background p-0.5">
+                    <button
+                        type="button"
+                        onClick={() => onChange(true)}
+                        className={cn(
+                            "px-2.5 py-1 text-xs rounded-md transition-colors",
+                            value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        開
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onChange(false)}
+                        className={cn(
+                            "px-2.5 py-1 text-xs rounded-md transition-colors",
+                            !value ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        關
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function SecurityTab({ env, onChangeEnv }: SecurityTabProps) {
     const { t } = useI18n();
     const whitelist = parseCsv(env.COMMAND_WHITELIST);
     const customCommands = parseCsv(env.CUSTOM_COMMANDS);
     const availableSystemCommands = SYSTEM_SAFE_LIBRARY.filter((cmd) => !whitelist.includes(cmd));
+    const automationMode = inferAutomationMode(env);
+    const autoApproveAll = isEnabled(env.GOLEM_AUTO_APPROVE_ALL);
+    const silentAutoApprove = isEnabled(env.GOLEM_SILENT_AUTO_APPROVE);
+    const trustSystemCommands = isEnabled(env.GOLEM_TRUST_SYSTEM_COMMANDS);
+    const strictSafeguard = isEnabled(env.GOLEM_STRICT_SAFEGUARD);
+
+    const applyAutomationMode = (mode: Exclude<AutomationMode, "custom">) => {
+        if (mode === "guided") {
+            onChangeEnv("GOLEM_AUTO_APPROVE_ALL", "false");
+            onChangeEnv("GOLEM_SILENT_AUTO_APPROVE", "false");
+            onChangeEnv("GOLEM_TRUST_SYSTEM_COMMANDS", "false");
+            onChangeEnv("GOLEM_STRICT_SAFEGUARD", "true");
+            onChangeEnv("GOLEM_MAX_AUTO_TURNS", "1");
+            onChangeEnv("GOLEM_INTERVENTION_LEVEL", "CONSERVATIVE");
+            return;
+        }
+
+        if (mode === "balanced") {
+            onChangeEnv("GOLEM_AUTO_APPROVE_ALL", "false");
+            onChangeEnv("GOLEM_SILENT_AUTO_APPROVE", "false");
+            onChangeEnv("GOLEM_TRUST_SYSTEM_COMMANDS", "true");
+            onChangeEnv("GOLEM_STRICT_SAFEGUARD", "true");
+            onChangeEnv("GOLEM_MAX_AUTO_TURNS", "2");
+            onChangeEnv("GOLEM_INTERVENTION_LEVEL", "NORMAL");
+            return;
+        }
+
+        if (mode === "autopilot") {
+            onChangeEnv("GOLEM_AUTO_APPROVE_ALL", "true");
+            onChangeEnv("GOLEM_SILENT_AUTO_APPROVE", "false");
+            onChangeEnv("GOLEM_TRUST_SYSTEM_COMMANDS", "true");
+            onChangeEnv("GOLEM_STRICT_SAFEGUARD", "true");
+            onChangeEnv("GOLEM_MAX_AUTO_TURNS", "4");
+            onChangeEnv("GOLEM_INTERVENTION_LEVEL", "NORMAL");
+            return;
+        }
+
+        onChangeEnv("GOLEM_AUTO_APPROVE_ALL", "true");
+        onChangeEnv("GOLEM_SILENT_AUTO_APPROVE", "true");
+        onChangeEnv("GOLEM_TRUST_SYSTEM_COMMANDS", "true");
+        onChangeEnv("GOLEM_STRICT_SAFEGUARD", "true");
+        onChangeEnv("GOLEM_MAX_AUTO_TURNS", "4");
+        onChangeEnv("GOLEM_INTERVENTION_LEVEL", "PROACTIVE");
+    };
 
     const moveToWhitelist = (item: string) => {
         if (!item || whitelist.includes(item)) return;
@@ -108,64 +219,128 @@ export default function SecurityTab({ env, onChangeEnv }: SecurityTabProps) {
                 <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                     {t("settings.security.title")}
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+                <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                <Bot className="h-4 w-4 text-primary" />
+                                自動化模式
+                            </h3>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                選擇 Golem 使用工具與指令時要多保守。推薦一般使用「平衡模式」。
+                            </p>
+                        </div>
+                        {automationMode === "custom" && (
+                            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
+                                自訂中
+                            </span>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        {[
+                            {
+                                id: "guided" as const,
+                                icon: ShieldCheck,
+                                title: "保守確認",
+                                desc: "每次工具鏈很快停下，適合剛開始或高風險任務。",
+                            },
+                            {
+                                id: "balanced" as const,
+                                icon: Gauge,
+                                title: "平衡模式",
+                                desc: "安全指令自動跑，複雜動作會停下來問你。",
+                                badge: "推薦",
+                            },
+                            {
+                                id: "autopilot" as const,
+                                icon: Sparkles,
+                                title: "自動駕駛",
+                                desc: "允許更多自動執行，仍保留回報與回合上限。",
+                            },
+                            {
+                                id: "silent" as const,
+                                icon: Bot,
+                                title: "靜默自動",
+                                desc: "減少中間訊息，只顯示結果；適合你完全信任的流程。",
+                            },
+                        ].map((mode) => {
+                            const Icon = mode.icon;
+                            const active = automationMode === mode.id;
+                            return (
+                                <button
+                                    key={mode.id}
+                                    type="button"
+                                    onClick={() => applyAutomationMode(mode.id)}
+                                    className={cn(
+                                        "text-left rounded-xl border p-4 transition-all",
+                                        active
+                                            ? "border-primary bg-primary/10 shadow-sm"
+                                            : "border-border bg-card hover:border-primary/40 hover:bg-secondary/30"
+                                    )}
+                                >
+                                    <div className="mb-3 flex items-center justify-between gap-2">
+                                        <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+                                        {mode.badge && (
+                                            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                                                {mode.badge}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-sm font-semibold text-foreground">{mode.title}</div>
+                                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{mode.desc}</p>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <SettingSelectField
-                        label={t("settings.security.intervention.label")}
-                        desc={t("settings.security.intervention.desc")}
+                        label="Golem 主動程度"
+                        desc="控制 Golem 要多主動提醒、建議與介入。這不等於指令自動批准。"
                         value={env.GOLEM_INTERVENTION_LEVEL || "NORMAL"}
                         onChange={(val) => onChangeEnv("GOLEM_INTERVENTION_LEVEL", val)}
                         options={[
-                            { value: "CONSERVATIVE", label: t("settings.security.intervention.option.conservative") },
-                            { value: "NORMAL", label: t("settings.security.intervention.option.normal") },
-                            { value: "PROACTIVE", label: t("settings.security.intervention.option.proactive") }
+                            { value: "CONSERVATIVE", label: "保守：只有重要狀況才提醒" },
+                            { value: "NORMAL", label: "一般：適度提供建議" },
+                            { value: "PROACTIVE", label: "積極：更像主動協作夥伴" }
                         ]}
                     />
                     <SettingField
-                        label={t("settings.security.maxAutoTurns.label")}
+                        label="連續自動執行上限"
                         keyName="GOLEM_MAX_AUTO_TURNS"
-                        placeholder="5"
-                        desc={t("settings.security.maxAutoTurns.desc")}
+                        placeholder="2"
+                        desc="工具或 MCP 連續回報時，最多允許 Golem 自動接續幾輪。數字越高越自動，越低越常停下來。"
                         value={env.GOLEM_MAX_AUTO_TURNS || ""}
                         onChange={(val) => onChangeEnv("GOLEM_MAX_AUTO_TURNS", val)}
                     />
                 </div>
-                <SettingField
-                    label={t("settings.security.strictSafeguard.label")}
-                    keyName="GOLEM_STRICT_SAFEGUARD"
-                    placeholder="false"
-                    desc={t("settings.security.strictSafeguard.desc")}
-                    value={env.GOLEM_STRICT_SAFEGUARD || ""}
-                    onChange={(val) => onChangeEnv("GOLEM_STRICT_SAFEGUARD", val)}
-                />
-                <SettingField
-                    label={t("settings.security.trustSystemLibrary.label")}
-                    keyName="GOLEM_TRUST_SYSTEM_COMMANDS"
-                    placeholder="false"
-                    desc={t("settings.security.trustSystemLibrary.desc")}
-                    value={env.GOLEM_TRUST_SYSTEM_COMMANDS || ""}
-                    onChange={(val) => onChangeEnv("GOLEM_TRUST_SYSTEM_COMMANDS", val)}
-                />
 
-                <div className="mt-6 p-4 border border-red-500/30 bg-red-500/5 rounded-lg">
-                    <div className="flex items-center gap-2 text-red-400 font-bold mb-2">
-                        <span className="text-xl">⚠️</span>
-                        <span>{t("settings.security.dangerZone.title")}</span>
-                    </div>
-                    <SettingField
-                        label={t("settings.security.fullAutoApprove.label")}
-                        keyName="GOLEM_AUTO_APPROVE_ALL"
-                        placeholder="false"
-                        desc={t("settings.security.fullAutoApprove.desc")}
-                        value={env.GOLEM_AUTO_APPROVE_ALL || ""}
-                        onChange={(val) => onChangeEnv("GOLEM_AUTO_APPROVE_ALL", val)}
+                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <ToggleField
+                        label="安全指令免確認"
+                        desc="例如查看檔案、列目錄、搜尋文字。開啟後日常查資料比較順。"
+                        value={trustSystemCommands}
+                        onChange={(value) => onChangeEnv("GOLEM_TRUST_SYSTEM_COMMANDS", String(value))}
                     />
-                    <SettingField
-                        label={t("settings.security.silentAutoApprove.label")}
-                        keyName="GOLEM_SILENT_AUTO_APPROVE"
-                        placeholder="false"
-                        desc={t("settings.security.silentAutoApprove.desc")}
-                        value={env.GOLEM_SILENT_AUTO_APPROVE || ""}
-                        onChange={(val) => onChangeEnv("GOLEM_SILENT_AUTO_APPROVE", val)}
+                    <ToggleField
+                        label="嚴格阻擋危險指令"
+                        desc="建議保持開啟。系統會更早攔截刪檔、格式化磁碟等高風險操作。"
+                        value={strictSafeguard}
+                        onChange={(value) => onChangeEnv("GOLEM_STRICT_SAFEGUARD", String(value))}
+                    />
+                    <ToggleField
+                        label="全部指令自動批准"
+                        desc="開啟後 Golem 會少問很多問題，但也代表你信任它執行大多數指令。"
+                        value={autoApproveAll}
+                        onChange={(value) => onChangeEnv("GOLEM_AUTO_APPROVE_ALL", String(value))}
+                    />
+                    <ToggleField
+                        label="隱藏中間執行訊息"
+                        desc="適合自動流程。開啟後會減少工具執行過程的聊天訊息。"
+                        value={silentAutoApprove}
+                        onChange={(value) => onChangeEnv("GOLEM_SILENT_AUTO_APPROVE", String(value))}
                     />
                 </div>
             </div>

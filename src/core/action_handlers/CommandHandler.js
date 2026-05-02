@@ -1,5 +1,5 @@
 class CommandHandler {
-    static async execute(ctx, normalActions, controller, brain, dispatchFn) {
+    static async execute(ctx, normalActions, controller, brain, dispatchFn, dispatchOptions = {}) {
         if (!normalActions || normalActions.length === 0) return;
 
         // ✨ [v9.1] 整合行動產線：將一般任務執行丟入 ActionQueue
@@ -78,7 +78,14 @@ class CommandHandler {
 
                 // 無論成功或失敗，都將完整觀察結果送給大腦分析（讓 AI 知道發生什麼事並作出回應）
                 if (ctx.sendTyping) await ctx.sendTyping();
-                const feedbackPrompt = `[System Observation]\n${result}\n\nPlease reply to user naturally using [GOLEM_REPLY].`;
+                const feedbackPrompt = `[System Observation]\n` +
+                    `以下是上一個指令序列的執行結果。\n\n` +
+                    `限制：\n` +
+                    `- 你現在處於 observation_summary 模式。\n` +
+                    `- 請只使用 [GOLEM_REPLY] 整理結果給使用者。\n` +
+                    `- 禁止輸出 [GOLEM_ACTION]。\n` +
+                    `- 如果你認為必須繼續使用工具或指令，請先說明原因並等待使用者確認。\n\n` +
+                    `指令結果：\n${result}`;
 
                 // ✨ [v9.1] 產線串接：將 Observation 放入對話產線
                 if (convoManager) {
@@ -88,6 +95,9 @@ class CommandHandler {
                         isPriority: true, 
                         bypassDebounce: true,
                         isSystemFeedback: true, // 🎯 [v9.1.15] Mark as system feedback for turn tracking
+                        allowActions: false,
+                        actionDepth: Number(dispatchOptions.actionDepth || 0) + 1,
+                        maxActionDepth: Number(dispatchOptions.maxActionDepth || process.env.GOLEM_MAX_AUTO_TURNS || 5),
                         suppressReply: isAuto && isSilent // 🎯 [v9.1.13] 全自動且靜默時，隱藏中間過程
                     };
                     await convoManager.enqueue(ctx, feedbackPrompt, feedbackOptions);

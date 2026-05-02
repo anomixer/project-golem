@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/components/ui/toast-provider";
 import { apiDeleteWrite, apiGet, apiPostWrite, apiWrite } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { Keyboard, Plus, Pencil, Trash2, Loader2, Save, X, Copy, Sparkles, RefreshCcw, TriangleAlert, Wand2, Activity } from "lucide-react";
+import { Keyboard, Plus, Pencil, Trash2, Loader2, Save, X, Copy, Sparkles, RefreshCcw, TriangleAlert, Wand2, Activity, Terminal } from "lucide-react";
 import { useI18n } from "@/components/I18nProvider";
 
 type PromptPoolItem = {
@@ -62,8 +62,21 @@ type PromptPoolAuditResponse = {
 
 type CommandsResponse = {
     success?: boolean;
-    commands?: { command?: string }[];
+    commands?: SystemCommand[];
 };
+
+type SystemCommandOption = {
+    name?: string;
+    description?: string;
+};
+
+type SystemCommand = {
+    command?: string;
+    description?: string;
+    options?: SystemCommandOption[];
+};
+
+type CommandCategory = "core" | "memory" | "project" | "automation" | "system" | "connectors";
 
 type PromptPoolForm = {
     shortcut: string;
@@ -94,6 +107,15 @@ function normalizeShortcutKey(input: string) {
         .replace(/^\/+/, "");
 }
 
+function getCommandCategory(command: string): CommandCategory {
+    if (command.startsWith("/@")) return "connectors";
+    if (["/wiki", "/search", "/profile", "/compress", "/callme", "/skills", "/feedback"].includes(command)) return "memory";
+    if (["/project", "/learn", "/export", "/patch", "/toolset"].includes(command)) return "project";
+    if (["/new", "/new_memory", "/model", "/sos", "/dashboard", "/level", "/update", "/reset", "/api", "/enable_silent", "/disable_silent", "/enable_observer", "/disable_observer"].includes(command)) return "system";
+    if (["/stocks", "/stock", "/stockboard", "/stock-dashboard"].includes(command)) return "automation";
+    return "core";
+}
+
 export default function PromptPoolPage() {
     const toast = useToast();
     const { locale } = useI18n();
@@ -107,6 +129,7 @@ export default function PromptPoolPage() {
     const [editingId, setEditingId] = useState<string>("");
     const [form, setForm] = useState<PromptPoolForm>(EMPTY_FORM);
     const [reservedCommands, setReservedCommands] = useState<Set<string>>(new Set());
+    const [systemCommands, setSystemCommands] = useState<SystemCommand[]>([]);
     const [legacyConflicts, setLegacyConflicts] = useState<PromptPoolLegacyConflict[]>([]);
     const [isRepairing, setIsRepairing] = useState(false);
     const [auditRecords, setAuditRecords] = useState<PromptPoolAuditRecord[]>([]);
@@ -153,6 +176,7 @@ export default function PromptPoolPage() {
                 const data = await apiGet<CommandsResponse>("/api/commands");
                 const set = new Set<string>();
                 if (Array.isArray(data.commands)) {
+                    setSystemCommands(data.commands);
                     for (const item of data.commands) {
                         const command = normalizeShortcutKey(String(item.command || ""));
                         if (command) set.add(command);
@@ -175,6 +199,34 @@ export default function PromptPoolPage() {
         () => [...items].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
         [items]
     );
+
+    const sortedSystemCommands = useMemo(
+        () => [...systemCommands]
+            .filter((item) => String(item.command || "").trim().startsWith("/"))
+            .sort((a, b) => String(a.command || "").localeCompare(String(b.command || ""))),
+        [systemCommands]
+    );
+
+    const commandGroups = useMemo(() => {
+        const labels: Record<CommandCategory, string> = {
+            core: isEnglish ? "Core" : "核心",
+            memory: isEnglish ? "Memory & Profile" : "記憶與使用者",
+            project: isEnglish ? "Project & Skills" : "專案與技能",
+            automation: isEnglish ? "Analysis" : "分析工具",
+            system: isEnglish ? "System Control" : "系統控制",
+            connectors: isEnglish ? "Connectors" : "外部服務",
+        };
+        const order: CommandCategory[] = ["core", "memory", "project", "automation", "system", "connectors"];
+        const groups = new Map<CommandCategory, SystemCommand[]>();
+        for (const item of sortedSystemCommands) {
+            const command = String(item.command || "").trim();
+            const category = getCommandCategory(command);
+            groups.set(category, [...(groups.get(category) || []), item]);
+        }
+        return order
+            .map((id) => ({ id, label: labels[id], commands: groups.get(id) || [] }))
+            .filter((group) => group.commands.length > 0);
+    }, [isEnglish, sortedSystemCommands]);
 
     const conflictReasonById = useMemo(() => {
         const map = new Map<string, string>();
@@ -685,6 +737,82 @@ export default function PromptPoolPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card className="border-border/80">
+                <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <Terminal className="w-4 h-4 text-primary" />
+                        {isEnglish ? `Built-in Slash Commands (${sortedSystemCommands.length})` : `系統內建 / 指令 (${sortedSystemCommands.length})`}
+                    </CardTitle>
+                    <CardDescription>
+                        {isEnglish
+                            ? "These commands are reserved by Golem. They cannot be used as custom prompt shortcuts."
+                            : "這些是 Golem 預設內建的系統指令，已保留給系統使用，不能拿來當自訂 Prompt 快捷指令。"}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {sortedSystemCommands.length === 0 ? (
+                        <div className="rounded-lg border border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
+                            {isEnglish ? "No built-in commands loaded." : "尚未載入系統內建指令。"}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {commandGroups.map((group) => (
+                                <section key={group.id} className="rounded-xl border border-border bg-card/50">
+                                    <div className="flex items-center justify-between border-b border-border/70 px-3 py-2">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                            {group.label}
+                                        </h3>
+                                        <span className="rounded-full border border-border bg-secondary/40 px-2 py-0.5 text-[10px] text-muted-foreground">
+                                            {group.commands.length}
+                                        </span>
+                                    </div>
+                                    <div className="divide-y divide-border/60">
+                                        {group.commands.map((item) => {
+                                            const command = String(item.command || "").trim();
+                                            const description = String(item.description || "").trim();
+                                            const options = Array.isArray(item.options) ? item.options : [];
+                                            return (
+                                                <div key={command} className="grid gap-2 px-3 py-2.5 md:grid-cols-[11rem_minmax(0,1fr)] md:items-start">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCopyShortcut(command)}
+                                                            className="inline-flex max-w-full items-center rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary hover:bg-primary/15"
+                                                            title={isEnglish ? "Copy command" : "複製指令"}
+                                                        >
+                                                            <span className="truncate">{command}</span>
+                                                        </button>
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs leading-relaxed text-muted-foreground">
+                                                            {description || (isEnglish ? "No description available." : "尚無說明。")}
+                                                        </p>
+                                                        {options.length > 0 && (
+                                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                                {options.slice(0, 6).map((option, idx) => (
+                                                                    <span
+                                                                        key={`${command}-option-${idx}`}
+                                                                        className="inline-flex max-w-full items-center rounded-md border border-border/70 bg-secondary/30 px-2 py-0.5 text-[10px] text-muted-foreground"
+                                                                        title={option.description || option.name || ""}
+                                                                    >
+                                                                        <span className="truncate font-mono text-foreground/85">{option.name || ""}</span>
+                                                                        {option.description && <span className="ml-1 truncate">· {option.description}</span>}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     );
 }
