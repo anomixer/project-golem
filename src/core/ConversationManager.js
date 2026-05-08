@@ -206,26 +206,38 @@ class ConversationManager {
 
         try {
             console.log(`🚀 [Dialogue Queue:${this.golemId}] 從隊列取出，開始處理對話...`);
-            console.log(`🗣️ [User->${this.golemId}] 說: ${task.text}${task.attachment ? ' 📎 含有附件' : ''}`, { attachment: task.attachment });
+            const isSystemFeedback = task.options && task.options.isSystemFeedback === true;
+            const logPreview = String(task.text || '').slice(0, isSystemFeedback ? 160 : 1000);
+            const truncatedMarker = String(task.text || '').length > logPreview.length ? '...' : '';
+            console.log(
+                isSystemFeedback
+                    ? `🧩 [System->${this.golemId}] Observation (${String(task.text || '').length} chars): ${logPreview}${truncatedMarker}`
+                    : `🗣️ [User->${this.golemId}] 說: ${logPreview}${truncatedMarker}${task.attachment ? ' 📎 含有附件' : ''}`,
+                { attachment: task.attachment }
+            );
 
-            // ✨ [Log] 記錄用戶輸入 (Fix missing user logs)
-            this.brain._appendChatLog({
-                timestamp: Date.now(),
-                sender: 'User', // 統一顯示為 User，也可由 ctx.userId 區分
-                content: task.text,
-                type: 'user',
-                role: 'User',
-                isSystem: false,
-                attachment: task.attachment
-            });
+            // ✨ [Log] 只記錄真正的使用者輸入；工具/技能 Observation 是內部上下文，不顯示在使用者歷史中。
+            if (!isSystemFeedback) {
+                this.brain._appendChatLog({
+                    timestamp: Date.now(),
+                    sender: 'User', // 統一顯示為 User，也可由 ctx.userId 區分
+                    content: task.text,
+                    type: 'user',
+                    role: 'User',
+                    isSystem: false,
+                    attachment: task.attachment
+                });
+            }
 
             await task.ctx.sendTyping();
-            const memories = await this.brain.recall(task.text);
+            const memories = isSystemFeedback ? [] : await this.brain.recall(task.text);
             let referenceContext = '';
-            try {
-                referenceContext = ReferenceFileService.buildContext(task.text, { limit: 4, maxChunkChars: 1200 });
-            } catch (error) {
-                console.warn(`[ReferenceFiles] 自動召回失敗: ${error.message}`);
+            if (!isSystemFeedback) {
+                try {
+                    referenceContext = ReferenceFileService.buildContext(task.text, { limit: 4, maxChunkChars: 1200 });
+                } catch (error) {
+                    console.warn(`[ReferenceFiles] 自動召回失敗: ${error.message}`);
+                }
             }
             let finalInput = task.text;
             if (referenceContext) {

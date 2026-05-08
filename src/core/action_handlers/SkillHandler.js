@@ -72,24 +72,19 @@ class SkillHandler {
                 }
                 const result     = await mcpManager.callTool(server, tool, parameters);
 
-                // 格式化結果
-                let displayResult = '';
+                // 格式化結果。完整內容只送回 LLM，避免工具輸出被截斷後影響後續分析。
+                let feedbackResult = '';
                 if (result && result.content && Array.isArray(result.content)) {
-                    displayResult = result.content
+                    feedbackResult = result.content
                         .map(c => c.type === 'text' ? c.text : JSON.stringify(c))
                         .join('\n');
                 } else {
-                    displayResult = JSON.stringify(result, null, 2);
-                }
-
-                const MAX_LEN = 3800;
-                if (displayResult.length > MAX_LEN) {
-                    displayResult = displayResult.slice(0, MAX_LEN) + '\n...(已截斷)';
+                    feedbackResult = JSON.stringify(result, null, 2);
                 }
 
                 // 🔇 結果只寫 log + 送給 LLM (sendFeedback)，不 ctx.reply
-                console.log(`[MCP] ✅ ${server}/${tool} 完成 (${displayResult.length} chars)`);
-                await sendFeedback(`[MCP Result - ${server}/${tool}]\n${displayResult}`);
+                console.log(`[MCP] ✅ ${server}/${tool} 完成 (${feedbackResult.length} chars)`);
+                await sendFeedback(`[MCP Result - ${server}/${tool}]\n${feedbackResult}`);
             } catch (e) {
                 // ⚠️ 錯誤仍然通知用戶（靜默失敗比用戶困惑更糟）
                 console.error(`[MCP] ❌ ${server}/${tool} 執行錯誤:`, e.message);
@@ -119,15 +114,12 @@ class SkillHandler {
                     io: { ask: (q) => ctx.reply(q) },
                     args: act
                 });
-                // ✅ [L-3 Fix] 截斷過長回傳，避免超過 Telegram 4096 字元上限
                 if (result) {
-                    const MAX_RESULT_LENGTH = 3800;
-                    const displayResult = result.length > MAX_RESULT_LENGTH
-                        ? result.slice(0, MAX_RESULT_LENGTH) + '\n...(已截斷)'
-                        : result;
-                    await ctx.reply(`✅ 技能回報: ${displayResult}`);
-                    await sendFeedback(`[Skill Result - ${dynamicSkill.name}]\n${result}`);
+                    console.log(`[Skill] ✅ ${dynamicSkill.name} 完成 (${String(result).length} chars)`);
+                    await ctx.reply(`✅ 技能「${dynamicSkill.name}」已完成，正在整理結果...`);
+                    await sendFeedback(`[Skill Result - ${dynamicSkill.name}]\n${String(result)}`);
                 } else {
+                    console.log(`[Skill] ✅ ${dynamicSkill.name} 完成 (無回傳值)`);
                     await sendFeedback(`[Skill Result - ${dynamicSkill.name}]\n(無回傳值)`);
                 }
             } catch (e) {

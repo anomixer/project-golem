@@ -2,11 +2,11 @@
   "source": "dashboard-stock-analysis",
   "dataStatus": "live-market-data",
   "marketFilter": "all",
-  "selectedRange": "1D",
+  "selectedRange": "3M",
   "selected": {
     "symbol": "2892",
     "yahooSymbol": "2892.TW",
-    "name": "First Financial Holding Co., Ltd.",
+    "name": "第一金",
     "market": "tw",
     "currency": "TWD",
     "exchangeName": "TAI",
@@ -23,31 +23,31 @@
     "volume": 39624454,
     "turnover": 1168921393,
     "marketCap": null,
-    "sector": "台股",
+    "sector": "金融保險",
     "dataSource": "Yahoo Finance",
     "lastUpdatedAt": "2026-05-08T05:30:22.000Z",
     "hasIntradayData": true,
     "dataQuality": "live"
   },
   "indicators": {
-    "sma5": 29.5,
-    "sma20": 29.470000171661376,
-    "rsi14": 58.33335982426973,
-    "macd": 0.03550705381498176,
-    "macdSignal": 0.04085733244695823,
-    "macdHistogram": -0.005350278631976471,
-    "stochasticK": 33.332909477003675,
-    "stochasticD": 27.777954382560704,
-    "volatility": 2.619211103545525,
-    "maxDrawdown": -0.6837632921006944,
-    "avgVolume20": 708111.15,
-    "volumeRatio": 0,
-    "distanceToSma20Percent": 0.1017978560022968
+    "sma5": 28.81999969482422,
+    "sma20": 28.652499771118165,
+    "rsi14": 60,
+    "macd": 0.06234546281549669,
+    "macdSignal": -0.03927586091868959,
+    "macdHistogram": 0.10162132373418628,
+    "stochasticK": 93.33330790201822,
+    "stochasticD": 84.34994413469624,
+    "volatility": 16.869774429283556,
+    "maxDrawdown": -6.333332061767578,
+    "avgVolume20": 27924036.75,
+    "volumeRatio": 1.4190088043054878,
+    "distanceToSma20Percent": 2.9578579029817083
   },
   "news": {
     "symbol": "2892",
     "yahooSymbol": "2892.TW",
-    "name": "First Financial Holding Co., Ltd.",
+    "name": "第一金",
     "market": "tw",
     "languagePriority": "zh-TW",
     "dateWindow": {
@@ -55,7 +55,7 @@
       "until": "2026-05-08",
       "days": 14
     },
-    "query": "2892 First Financial Holding Co., Ltd. 股票 新聞 最新 after:2026-04-24 before:2026-05-08",
+    "query": "2892 第一金 股票 新聞 最新 after:2026-04-24 before:2026-05-08",
     "source": "Yahoo 股市 RSS + Yahoo Finance news + Google News RSS + DuckDuckGo HTML search",
     "sourceStatus": [
       {
@@ -66,12 +66,12 @@
       {
         "source": "Yahoo Finance news",
         "status": "ok",
-        "count": 1
+        "count": 0
       },
       {
         "source": "Google News RSS",
         "status": "ok",
-        "count": 0
+        "count": 22
       },
       {
         "source": "DuckDuckGo HTML search",
@@ -79,49 +79,49 @@
         "count": 6
       }
     ],
-    "fetchedAt": "2026-05-08T09:44:34.418Z",
+    "fetchedAt": "2026-05-08T13:07:16.880Z",
     "results": [
       {
-        "title": "ZIM to Release First Quarter 2026 Results on Wednesday, May 20, 2026",
-        "url": "https://finance.yahoo.com/markets/stocks/articles/zim-release-first-quarter-2026-120000718.html",
-        "snippet": "PR Newswire",
-        "source": "Yahoo Finance · PR Newswire",
-        "publishedAt": "2026-04-29T12:00:00.000Z"
+        "title": "第一金(2892)- - 券商分點進出買賣統計-股市爆料同學會 - CMoney",
+        "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE1UU3R3Skg0bTdYdGV4X3VkTGhCXzc5Wm1sLTFSTnpwVkRYdWlnb0h2cEc2MzJfWkFZTnFnT21sSXVGVmJPMWhBSjQyLTVzMjNMTHlreG1HWTJGa3hiX3M3R0xWUFY4cHJOWUE?oc=5",
+        "snippet": "第一金(2892)- - 券商分點進出買賣統計-股市爆料同學會&nbsp;&nbsp;CMoney",
+        "source": "Google News RSS",
+        "publishedAt": "2026-05-05T05:06:42.000Z"
       },
       {
-        "title": "【即時新聞】第一金(2892)今日開低走高 股價上漲1.05％成交量達79715張",
-        "url": "https://www.cmoney.tw/notes/note-detail.aspx?nid=1178932",
-        "snippet": "第一金 (2892)今日股價開低走高，漲1.05%至28.85元，成交量放大至79715張。 2026Q1稅後純益年增14.4%，配發1.3元現金股息殖利率4.5%。 成長主軸包括淨利息及手續費收入，外資買超支持，技術面27-30元區間整理。",
-        "source": "www.cmoney.tw/notes/note-detail.aspx?nid=1178932",
-        "publishedAt": ""
+        "title": "第一金(2892)-國票-長城 - 券商分點進出買賣統計-股市爆料同學會 - CMoney",
+        "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTE4xS19kT093aXpfdjdrLTVBWGdJeHdjY1F5SUZMcFBPMGpzRkRzWG9TMVUxMl9TVUszNjlBUXNkbmtzZHBiVzJFSURyZHhJeDNZQXd2U0tZVDkyX1BLRXU5OFp3bE1QblRpN0tv?oc=5",
+        "snippet": "第一金(2892)-國票-長城 - 券商分點進出買賣統計-股市爆料同學會&nbsp;&nbsp;CMoney",
+        "source": "Google News RSS",
+        "publishedAt": "2026-05-05T04:36:45.000Z"
       },
       {
-        "title": "第一金首度全配現金1.3元不發股票 股價黑翻紅小漲1% 成交量居金融股之冠 - Yahoo奇摩股市",
-        "url": "https://tw.stock.yahoo.com/news/第一金首度全配現金13元不發股票-股價黑翻紅小漲1-成交量居金融股之冠-014627660.html",
-        "snippet": "第一金今日股價以28.3元盤下開出後，一度回落28.25元，跌幅約1.05%，所幸盤中買盤回溫，漲1.23%至28.9元，順利翻紅；量能方面，開盤1小時成交量即突破2.5萬張，超過昨日的1.9萬張，交投明顯熱絡。",
-        "source": "tw.stock.yahoo.com/news/第一金首度全配現金13元不發股票-股價黑翻紅小漲1-成交量居金融股之冠-014627660.html",
-        "publishedAt": ""
+        "title": "第一金(2892)-群益金鼎-竹南 - 券商分點進出買賣統計-股市爆料同學會 - CMoney",
+        "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTE1GcTJIdHlfRHBERXc3OFpydWFIREFaYnB5bG9DVXVzcXlTX3Q4N0xac0ctVVNlMjh1aGtEWXVXQThpNjZrTjlKcGNVTEdfWE9HaHp0TEtDY1E3b1k5cGpaa3pkRFBqQmxBMzVv?oc=5",
+        "snippet": "第一金(2892)-群益金鼎-竹南 - 券商分點進出買賣統計-股市爆料同學會&nbsp;&nbsp;CMoney",
+        "source": "Google News RSS",
+        "publishedAt": "2026-05-04T20:22:52.000Z"
       },
       {
-        "title": "2892 第一金 公告訊息 - 代子公司第一銀行公告董事會決議之114年度可分配盈餘轉增資發行新股案 - 發布時間:2026 ...",
-        "url": "https://goodinfo.tw/tw/data/StockAnnounceDetail.asp?STOCK_ID=2892&CLAIM_TIME=2026/04/17+14:47:07&SUBJECT=代子公司第一銀行公告董事會決議之114年度可分配盈餘轉增資發行新股案",
-        "snippet": "2892 第一金 公告訊息 - 代子公司第一銀行公告董事會決議之114年度可分配盈餘轉增資發行新股案 - 發布時間:2026/04/17 14:47:07 - Goodinfo!台灣股市資訊網",
-        "source": "goodinfo.tw/tw/data/StockAnnounceDetail.asp?STOCK_ID=2892&CLAIM_TIME=2026/04/17+14:47:07&SUBJECT=代子公司第一銀行公告董事會決議之114年度可分配盈餘轉增資發行新股案",
-        "publishedAt": ""
+        "title": "第一金怎麼這樣討人厭？ - CMoney",
+        "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE9xclBxS2NmQlN3X0dfYkR2cmZLVnRNNE1zdEMyTWRjNlFHM2RqYzhWd2x4RG1id3hueHpaMHF6c3VMMzFfNmE5WXVJd1Q5enJjS2hmMFlHRkE?oc=5",
+        "snippet": "第一金怎麼這樣討人厭？&nbsp;&nbsp;CMoney",
+        "source": "Google News RSS",
+        "publishedAt": "2026-05-04T10:06:59.000Z"
       },
       {
-        "title": "(2892)第一金價量走勢圖 - PChome Online 股市",
-        "url": "https://pchome.megatime.com.tw/stock/sto0/sid2892.html",
-        "snippet": "第一金 (2892)個股即時資訊 - 成交價: 28.85, 漲跌: +0.30, PChome Online股市提供即時報價、個股走勢、成交資訊、當日行情，價量變化、個股健診及個股相關新聞等。",
-        "source": "pchome.megatime.com.tw/stock/sto0/sid2892.html",
-        "publishedAt": ""
+        "title": "2892 第一金- 官股存股族的抉擇-股市爆料同學會 - CMoney",
+        "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE5FMUhhUnJ3bjA2emVCS2hvOVNiRllQdENGdVFLUFMyT3czcTB3R0szeEFZMU14aDg3QWJ5NUdsTldxMXc1NDJPWFBwcVl3WDdXdGlRS0NiNjg?oc=5",
+        "snippet": "2892 第一金- 官股存股族的抉擇-股市爆料同學會&nbsp;&nbsp;CMoney",
+        "source": "Google News RSS",
+        "publishedAt": "2026-05-02T17:05:19.000Z"
       },
       {
-        "title": "[第一金 2892.tw] 代子公司第一商業銀行公告出售聯貸案不良授信債權",
-        "url": "https://finance.biggo.com.tw/news/twse_major_2892_1150424_144328",
-        "snippet": "第一金子公司第一商業銀行於115年4月24日公告出售聯貸案不良授信債權，惟公告中未揭露具體金額、交易對象及對財務影響等細節。 該交易屬子公司層級，對第一金控股東權益或證券價格無重大影響。",
-        "source": "finance.biggo.com.tw/news/twse_major_2892_1150424_144328",
-        "publishedAt": ""
+        "title": "第一金2026年第1季EPS創歷史紀錄與展望 - CMoney",
+        "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE0zZVh4RjRQQlBvQVdKU290SFoycnpubEdCRUVUcktMSWlsdDEwWHBFNEpyeF9weW9rRGkwalhNQVpCOWl3aVAwQnN0aXpiRS1KS2lmcU9FMFM?oc=5",
+        "snippet": "第一金2026年第1季EPS創歷史紀錄與展望&nbsp;&nbsp;CMoney",
+        "source": "Google News RSS",
+        "publishedAt": "2026-05-02T13:34:43.000Z"
       }
     ]
   },
@@ -129,7 +129,7 @@
     {
       "symbol": "2892",
       "yahooSymbol": "2892.TW",
-      "name": "First Financial Holding Co., Ltd.",
+      "name": "第一金",
       "market": "tw",
       "currency": "TWD",
       "exchangeName": "TAI",
@@ -146,7 +146,7 @@
       "volume": 39624454,
       "turnover": 1168921393,
       "marketCap": null,
-      "sector": "台股",
+      "sector": "金融保險",
       "dataSource": "Yahoo Finance",
       "lastUpdatedAt": "2026-05-08T05:30:22.000Z",
       "hasIntradayData": true,
@@ -155,7 +155,7 @@
     {
       "symbol": "00918",
       "yahooSymbol": "00918.TW",
-      "name": "UOB Taiwan High Dividend Recovery ETF",
+      "name": "大華優利高填息30",
       "market": "tw",
       "currency": "TWD",
       "exchangeName": "TAI",
@@ -172,7 +172,7 @@
       "volume": 54692036,
       "turnover": 1372770103.6000001,
       "marketCap": null,
-      "sector": "台股",
+      "sector": "ETF",
       "dataSource": "Yahoo Finance",
       "lastUpdatedAt": "2026-05-08T05:30:08.000Z",
       "hasIntradayData": true,
@@ -181,7 +181,7 @@
     {
       "symbol": "00919",
       "yahooSymbol": "00919.TW",
-      "name": "Capital Tip Customized Taiwan Select High Dividend ETF",
+      "name": "群益台灣精選高息",
       "market": "tw",
       "currency": "TWD",
       "exchangeName": "TAI",
@@ -198,7 +198,7 @@
       "volume": 207423513,
       "turnover": 5283076876.11,
       "marketCap": null,
-      "sector": "台股",
+      "sector": "ETF",
       "dataSource": "Yahoo Finance",
       "lastUpdatedAt": "2026-05-08T05:30:03.000Z",
       "hasIntradayData": true,
@@ -213,11 +213,6 @@
     "count": 3
   },
   "quoteErrors": [],
-  "generatedAt": "2026-05-08T09:44:34.418Z",
-  "refresh": {
-    "trigger": "skill-stock-dashboard",
-    "status": "ok",
-    "previousSavedAt": "2026-05-08T00:03:42.745Z"
-  },
-  "savedAt": "2026-05-08T09:44:34.418Z"
+  "generatedAt": "2026-05-08T13:07:16.881Z",
+  "savedAt": "2026-05-08T13:07:17.394Z"
 }
