@@ -31,6 +31,24 @@ const STOCK_NAME_SYMBOLS = {
     '中信金': '2891.TW',
 };
 const TAIWAN_SYMBOL_RE = /^\d{4,6}[A-Z]{0,3}$/;
+const STOCK_SYMBOL_STOP_WORDS = new Set([
+    'BOARD',
+    'STOCK',
+    'STOCKS',
+    'DASHBOARD',
+    'MARKET',
+    'ANALYSIS',
+    'DATA',
+    'LIVE',
+    'SIDE',
+    'RANGE',
+    'JSON',
+    'TRUE',
+    'FALSE',
+    'NULL',
+    'SOURCE',
+    'STATUS',
+]);
 
 function normalizeStockSymbol(input) {
     const value = String(input || '').trim().toUpperCase();
@@ -48,7 +66,13 @@ function extractStockSymbolsFromText(text) {
     const symbolMatches = String(text || '').match(/\b[A-Z]{1,5}\b|\b\d{4,6}[A-Z]{0,3}(?:\.(?:TW|TWO))?\b/gi) || [];
     symbolMatches
         .map(normalizeStockSymbol)
-        .filter(Boolean)
+        .filter((symbol) => {
+            if (!symbol) return false;
+            const displaySymbol = symbol.replace(/\.(TW|TWO)$/i, '');
+            if (STOCK_SYMBOL_STOP_WORDS.has(displaySymbol)) return false;
+            if (/^(19|20)\d{2}$/.test(displaySymbol)) return false;
+            return true;
+        })
         .forEach((symbol) => found.add(symbol));
     return Array.from(found).slice(0, 8);
 }
@@ -260,7 +284,7 @@ class NodeRouter {
         if (text.startsWith('/patch') || text.includes('優化代碼')) return false;
 
         const wantsStockDashboard =
-            /^\/(stocks?|stockboard|stock-dashboard)(\s|$)/i.test(text) ||
+            /^\/(stockboard|stock-dashboard|stocks?)(\s|$)/i.test(text) ||
             /(分析|研究|評估|看看|幫我看).{0,24}(股票|股價|台股|美股|個股|台積電|鴻海|聯發科|NVDA|AAPL|TSM|\d{4,6})/i.test(text) ||
             /(股票|股價|台股|美股|個股|台積電|鴻海|聯發科|NVDA|AAPL|TSM|\d{4,6}).{0,24}(分析|研究|評估|能不能|可不可以|追|買|賣)/i.test(text) ||
             /(股市|股票|行情).{0,8}(看板|dashboard)/i.test(text) ||
@@ -268,7 +292,7 @@ class NodeRouter {
             /stock\s+dashboard/i.test(text);
 
         if (wantsStockDashboard) {
-            const userRequest = text.replace(/^\/(stocks?|stockboard|stock-dashboard)\s*/i, '').trim() || '請分析目前股市看板。';
+            const userRequest = text.replace(/^\/(stockboard|stock-dashboard|stocks?)\s*/i, '').trim() || '請分析目前股市看板。';
             const symbols = extractStockSymbolsFromText(userRequest);
             const enrichedText = [
                 userRequest,
