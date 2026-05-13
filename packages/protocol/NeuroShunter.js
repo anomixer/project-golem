@@ -358,16 +358,17 @@ class NeuroShunter {
 
                 observationLines.push('請根據以上資訊修正你的 [GOLEM_ACTION]，或告知使用者需要的操作。');
                 const observationText = observationLines.join('\n');
+                const canRetryFromGateFeedback = actionDepth < maxActionDepth;
 
                 // 透過 convoManager 注入 [System Observation]（讓 Golem 的下一輪能看到）
-                // 即使 allowActions=false，也應回灌給 Golem 讓其知道哪裡被擋；僅禁止再自動執行 action。
+                // ActionGate 回灌後允許進行修正重試（受 actionDepth/maxActionDepth 保護）。
                 if (controller && controller.convoManager) {
                     await controller.convoManager.enqueue(ctx, observationText, {
                         isPriority: true,
                         bypassDebounce: true,
                         isSystemFeedback: true,
                         suppressReply: true,
-                        allowActions: allowActions === true,
+                        allowActions: canRetryFromGateFeedback,
                         actionDepth: actionDepth + 1,
                         maxActionDepth,
                     });
@@ -375,9 +376,11 @@ class NeuroShunter {
                     try {
                         await brain.sendMessage(observationText, false, {
                             isSystemFeedback: true,
-                            allowActions: false,
+                            allowActions: canRetryFromGateFeedback,
                             disableToolRouting: true,
                             suppressReply: true,
+                            actionDepth: actionDepth + 1,
+                            maxActionDepth,
                         });
                     } catch (injectErr) {
                         console.warn(`[ActionGate] Failed to inject fallback observation to brain: ${injectErr.message}`);

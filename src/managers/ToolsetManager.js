@@ -26,8 +26,8 @@ const ATOMIC_TOOLS = {
     mcp:     ['mcp'],
     // 社群整合
     social:  ['moltbot'],
-    // 生產力（日曆、排程）
-    productivity: ['collab-calendar', 'schedule', 'list-schedules'],
+    // 生產力（日曆）
+    productivity: ['collab-calendar'],
 };
 
 // ── 場景工具集（Scene Toolsets）────────────────────────────────────
