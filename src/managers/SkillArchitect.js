@@ -29,7 +29,7 @@ class SkillArchitect {
         ### CONTEXT
         - Environment: Node.js (no browser needed unless stated)
         - The skill exports: module.exports = { name, description, tags, run }
-        - run(ctx, args): ctx has { log, io, metadata }
+        - Runtime call signature is run(ctx), and args are provided at ctx.args
         - Existing Skills: ${existingSkills.map(s => s.name).join(', ')}
 
         ### STRICT OUTPUT FORMAT (follow exactly, no markdown fences)
@@ -46,7 +46,8 @@ class SkillArchitect {
             name: 'SKILL_NAME',
             description: 'Short description',
             tags: ['#user-generated'],
-            async run(ctx, args) {
+            async run(ctx = {}) {
+                const args = (ctx && ctx.args) || {};
                 // your implementation here
                 return 'result message';
             }
@@ -139,10 +140,11 @@ class SkillArchitect {
             }
 
 
-            // 4. 安全掃描 + 驗證與存檔
+            // 4. 正規化程式碼 + 安全掃描 + 驗證與存檔
             if (!skillData.filename || !skillData.code) {
                 throw new Error("Invalid generation: Missing filename or code.");
             }
+            skillData.code = this._normalizeGeneratedCode(skillData.code);
 
             // ✅ [H-4 Fix] 寫入磁碟前進行安全掃描，防止惡意 AI 注入危險代碼
             // 注意：使用精確詞彙邊界比對，避免 regex.exec()、str.exec() 等合法呼叫被誤判
@@ -222,6 +224,20 @@ class SkillArchitect {
                 version: '1.0.0'
             }, null, 2) + '\n', 'utf8');
 
+            // 寫檔後強驗證：檔案存在 + 可 require + 必須有 run()
+            if (!fs.existsSync(finalPath)) {
+                throw new Error(`Skill script not found after write: ${finalPath}`);
+            }
+            const stat = fs.statSync(finalPath);
+            if (!stat.isFile() || stat.size <= 0) {
+                throw new Error(`Skill script is empty or invalid: ${finalPath}`);
+            }
+            delete require.cache[require.resolve(finalPath)];
+            const loadedModule = require(finalPath);
+            if (!loadedModule || typeof loadedModule.run !== 'function') {
+                throw new Error('Generated skill script is not executable: missing run() export.');
+            }
+
             return {
                 success: true,
                 path: finalPath,
@@ -236,6 +252,30 @@ class SkillArchitect {
             console.error("❌ Architect Error:", error);
             return { success: false, error: error.message };
         }
+    }
+
+    _normalizeGeneratedCode(rawCode) {
+        let code = String(rawCode || '').trim();
+        code = code
+            .replace(/^```(?:javascript|js)?\s*/i, '')
+            .replace(/```\s*$/i, '')
+            .trim();
+
+        if (!code.includes('module.exports')) {
+            throw new Error('Generated code missing module.exports.');
+        }
+
+        // 相容舊輸出：run(ctx, args) -> run(ctx = {})，並保留 args 可用性
+        code = code.replace(/async\s+run\s*\(\s*ctx\s*,\s*args\s*\)\s*\{/g, 'async run(ctx = {}) {');
+        code = code.replace(/run\s*:\s*async\s*\(\s*ctx\s*,\s*args\s*\)\s*=>\s*\{/g, 'run: async (ctx = {}) => {');
+
+        // 若 run 已改成只吃 ctx，且函式內沒建立 args，補上一行避免 ctx.args 遺漏
+        const runHeadRe = /async\s+run\s*\(\s*ctx(?:\s*=\s*\{\s*\})?\s*\)\s*\{/;
+        if (runHeadRe.test(code) && !/\bconst\s+args\s*=/.test(code) && !/\blet\s+args\s*=/.test(code)) {
+            code = code.replace(runHeadRe, (match) => `${match}\n        const args = (ctx && ctx.args) || {};`);
+        }
+
+        return code;
     }
 }
 

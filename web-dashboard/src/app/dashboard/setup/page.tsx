@@ -50,11 +50,25 @@ interface MemoryImportResponse {
     targetPath?: string;
     backupPath?: string | null;
     summary?: {
-        files: number;
-        directories: number;
-        bytes: number;
+        mode?: "replace" | "merge-fallback";
+        files?: number;
+        directories?: number;
+        bytes?: number;
         skipped?: { path: string; reason: string }[];
+        copiedFromTemp?: {
+            files?: number;
+            directories?: number;
+            bytes?: number;
+            skipped?: { path: string; reason: string }[];
+        };
+        mergedInPlace?: {
+            files?: number;
+            directories?: number;
+            bytes?: number;
+            skipped?: { path: string; reason: string }[];
+        };
     };
+    lockHints?: string[];
     skipped?: { path: string; reason: string }[];
     warning?: string;
 }
@@ -139,6 +153,25 @@ export default function GolemSetupPage() {
     const [isBrowsingMemory, setIsBrowsingMemory] = useState(false);
     const [isImportingMemory, setIsImportingMemory] = useState(false);
     const [memoryImportResult, setMemoryImportResult] = useState<MemoryImportResponse | null>(null);
+
+    const extractSkippedItems = useCallback((result: MemoryImportResponse | null) => {
+        if (!result) return [] as { path: string; reason: string }[];
+        const direct = result.summary?.skipped || [];
+        const fromMerge = result.summary?.mergedInPlace?.skipped || [];
+        const legacy = result.skipped || [];
+        return [...direct, ...fromMerge, ...legacy].slice(0, 8);
+    }, []);
+
+    const getCopiedFilesCount = useCallback((result: MemoryImportResponse | null) => {
+        if (!result) return 0;
+        const mode = result.summary?.mode;
+        if (mode === "merge-fallback") {
+            const a = Number(result.summary?.copiedFromTemp?.files || 0);
+            const b = Number(result.summary?.mergedInPlace?.files || 0);
+            return a + b;
+        }
+        return Number(result.summary?.files || 0);
+    }, []);
 
     // Fetch templates from backend
     useEffect(() => {
@@ -226,11 +259,12 @@ export default function GolemSetupPage() {
 
             if (data.success) {
                 setMemoryImportResult(data);
-                const skippedCount = data.summary?.skipped?.length ?? 0;
+                const skippedCount = extractSkippedItems(data).length;
+                const copiedFiles = getCopiedFilesCount(data);
                 if (skippedCount > 0) {
-                    toast.warning("記憶轉生部分完成", `已複製 ${data.summary?.files ?? 0} 個檔案，另有 ${skippedCount} 個項目因權限或特殊類型被跳過。`);
+                    toast.warning("記憶轉生部分完成", `已複製 ${copiedFiles} 個檔案，另有 ${skippedCount} 個項目因權限或特殊類型被跳過。`);
                 } else {
-                    toast.success("記憶轉生完成", `已複製 ${data.summary?.files ?? 0} 個記憶檔案。`);
+                    toast.success("記憶轉生完成", `已複製 ${copiedFiles} 個記憶檔案。`);
                 }
             } else {
                 setMemoryImportResult(data);
@@ -242,7 +276,25 @@ export default function GolemSetupPage() {
         } finally {
             setIsImportingMemory(false);
         }
-    }, [memoryPathInput, toast]);
+    }, [extractSkippedItems, getCopiedFilesCount, memoryPathInput, toast]);
+
+    const stopGolemAndRetryMemoryImport = useCallback(async () => {
+        if (!activeGolem) {
+            toast.error("無法停止 Golem", "目前沒有可停止的 Golem 實例。");
+            return;
+        }
+        try {
+            setIsImportingMemory(true);
+            await apiPost("/api/golems/stop", { id: activeGolem });
+            toast.success("已停止 Golem", "已嘗試釋放記憶體與瀏覽器鎖定，準備重試轉生。");
+            await importReincarnatedMemory();
+        } catch (e) {
+            const message = e instanceof Error ? e.message : "停止 Golem 失敗";
+            toast.error("停止 Golem 失敗", message);
+        } finally {
+            setIsImportingMemory(false);
+        }
+    }, [activeGolem, importReincarnatedMemory, toast]);
 
     // Extra skills that exist in ALL_AVAILABLE_SKILLS but not in the template
     const extraSkillsToShow = ALL_AVAILABLE_SKILLS.filter(s => !skills.includes(s));
@@ -657,14 +709,25 @@ export default function GolemSetupPage() {
 
                                     {memoryImportResult?.success && (
                                         <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 leading-relaxed">
-                                            已從舊專案複製 {memoryImportResult.summary?.files ?? 0} 個檔案到新專案記憶庫。
+                                            已從舊專案複製 {getCopiedFilesCount(memoryImportResult)} 個檔案到新專案記憶庫。
+                                            {memoryImportResult.summary?.mode === "merge-fallback" && (
+                                                <span className="block mt-1 text-amber-200">
+                                                    偵測到 Windows/瀏覽器鎖定，已改用「就地合併」模式完成轉生。
+                                                </span>
+                                            )}
                                             {memoryImportResult.backupPath && (
                                                 <span className="block mt-1 text-emerald-300/75">原本的新專案記憶已備份：{memoryImportResult.backupPath}</span>
                                             )}
-                                            {(memoryImportResult.summary?.skipped?.length ?? 0) > 0 && (
+                                            {(extractSkippedItems(memoryImportResult).length ?? 0) > 0 && (
                                                 <span className="block mt-2 text-amber-200">
-                                                    有 {memoryImportResult.summary?.skipped?.length} 個項目因權限或特殊檔案類型被跳過：
-                                                    {memoryImportResult.summary?.skipped?.slice(0, 3).map((item) => ` ${item.path} (${item.reason})`).join("；")}
+                                                    有 {extractSkippedItems(memoryImportResult).length} 個項目因權限或特殊檔案類型被跳過：
+                                                    {extractSkippedItems(memoryImportResult).slice(0, 3).map((item) => ` ${item.path} (${item.reason})`).join("；")}
+                                                </span>
+                                            )}
+                                            {(memoryImportResult.lockHints?.length ?? 0) > 0 && (
+                                                <span className="block mt-2 text-amber-200">
+                                                    可能鎖定檔案：
+                                                    {memoryImportResult.lockHints?.slice(0, 3).map((item) => ` ${item}`).join("；")}
                                                 </span>
                                             )}
                                         </div>
@@ -695,6 +758,18 @@ export default function GolemSetupPage() {
                                                 執行記憶轉生
                                             </span>
                                         )}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={stopGolemAndRetryMemoryImport}
+                                        disabled={isImportingMemory || !memoryPathInput.trim() || !activeGolem}
+                                        className="w-full"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <HardDrive className="w-4 h-4" />
+                                            先停止 Golem 並重試轉生
+                                        </span>
                                     </Button>
                                 </div>
                             )}

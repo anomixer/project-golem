@@ -8,6 +8,7 @@ const wikiSkill = require('../skills/modules/wiki/index.js');
 const { toolsetManager, SCENE_TOOLSETS } = require('../managers/ToolsetManager');
 const { hookSystem } = require('./HookSystem'); // ⚡ [OpenHarness-inspired]
 const { buildFreshStockSnapshotInjection } = require('../services/StockDashboardSnapshot');
+const fs = require('fs');
 
 // ✨ [v9.1 Addon] 初始化技能架構師 (Web Gemini Mode)
 // 注意：這裡不傳入 Model，因為我們將在 NodeRouter 中傳入 Web Brain
@@ -109,6 +110,32 @@ class NodeRouter {
                 });
             } catch (err) {
                 console.warn(`[NodeRouter] system change sync failed: ${err.message}`);
+            }
+        };
+        const notifyLearnOutcome = async ({ success, actionId = '', filePath = '', reason = '' } = {}) => {
+            if (!brain || typeof brain.sendMessage !== 'function') return;
+            const lines = success
+                ? [
+                    '[Learn Observation]',
+                    `status=success`,
+                    `action=${actionId || 'unknown'}`,
+                    `file=${filePath || 'unknown'}`,
+                    '請記住此技能已可執行；後續若要使用，請用 action JSON 格式呼叫。'
+                ]
+                : [
+                    '[Learn Observation]',
+                    'status=failed',
+                    `reason=${reason || 'unknown error'}`,
+                    '請先向使用者說明失敗原因，並詢問是否同意你再重試一次 /learn；未獲同意前請勿自動重試。'
+                ];
+            try {
+                await brain.sendMessage(lines.join('\n'), false, {
+                    isSystemFeedback: true,
+                    allowActions: false,
+                    disableToolRouting: true,
+                });
+            } catch (err) {
+                console.warn(`[NodeRouter] learn outcome sync failed: ${err.message}`);
             }
         };
 
@@ -226,19 +253,32 @@ class NodeRouter {
                 const result = await architect.designSkill(brain, intent, skillManager.listSkills());
 
                 if (result.success) {
+                    const runtimeSkillId = String(
+                        result.id || require('path').basename(result.path || '', '.js')
+                    ).toLowerCase();
+                    if (!result.path || !fs.existsSync(result.path)) {
+                        const reason = `技能檔案未成功寫入（${result.path || 'unknown path'}）`;
+                        await notifyLearnOutcome({ success: false, reason });
+                        return await reply(`❌ **學習失敗**: ${reason}。未進行註冊。`);
+                    }
                     // 1) 熱重載 SkillManager，讓動態 JS 技能可立即執行
                     try {
                         skillManager.refresh();
                     } catch (refreshError) {
                         console.warn(`⚠️ [NodeRouter] SkillManager refresh failed after /learn: ${refreshError.message}`);
                     }
+                    const loadedSkill = skillManager.getSkill(runtimeSkillId);
+                    if (!loadedSkill || typeof loadedSkill.run !== 'function') {
+                        const reason = `技能已生成但未成功載入（action: ${runtimeSkillId}）`;
+                        await notifyLearnOutcome({ success: false, reason });
+                        return await reply(
+                            `❌ **學習失敗**: 技能已生成但未成功載入（action: \`${runtimeSkillId}\`）。為避免假技能，系統已阻止註冊。`
+                        );
+                    }
 
                     // 2) 直接寫入 SQLite 索引，讓 Dashboard 立即可見
                     try {
                         const SkillIndexManager = require('../managers/SkillIndexManager');
-                        const runtimeSkillId = String(
-                            result.id || require('path').basename(result.path || '', '.js')
-                        ).toLowerCase();
 
                         if (runtimeSkillId) {
                             const SkillPackageRegistry = require('../managers/SkillPackageRegistry');
@@ -281,12 +321,25 @@ class NodeRouter {
                 }
 
                 const response = result.success
-                    ? `✅ **新技能編寫完成！**\n📜 **名稱**: \`${result.name}\`\n📝 **描述**: ${result.preview}\n📂 **檔案**: \`${require('path').basename(result.path)}\`\n_現在可以直接命令我使用此功能，且已同步到 SQLite，可在 Dashboard 看見。_`
+                    ? `✅ **新技能編寫完成！**\n📜 **名稱**: \`${result.name}\`\n🧩 **Action**: \`${result.id || require('path').basename(result.path || '', '.js')}\`\n📝 **描述**: ${result.preview}\n📂 **檔案**: \`${require('path').basename(result.path)}\`\n\n` +
+                      `建議呼叫格式：\n\`\`\`json\n{"action":"${result.id || require('path').basename(result.path || '', '.js')}","args":{"input":"..."}}\n\`\`\`\n` +
+                      `_現在可以直接命令我使用此功能，且已同步到 SQLite，可在 Dashboard 看見。_`
                     : `❌ **學習失敗**: ${result.error}`;
+
+                if (result.success) {
+                    await notifyLearnOutcome({
+                        success: true,
+                        actionId: String(result.id || require('path').basename(result.path || '', '.js')).toLowerCase(),
+                        filePath: result.path || ''
+                    });
+                } else {
+                    await notifyLearnOutcome({ success: false, reason: result.error || 'unknown error' });
+                }
 
                 return await reply(response);
             } catch (e) {
                 console.error(e);
+                await notifyLearnOutcome({ success: false, reason: e.message || 'fatal error' });
                 return await reply(`❌ **致命錯誤**: ${e.message}`);
             }
         }
@@ -688,6 +741,8 @@ class NodeRouter {
         // [Phase 2] Hermes-inspired: 切換場景化工具集
         if (text === '/toolset' || text.startsWith('/toolset ')) {
             const subCmd = text.replace(/^\/toolset\s*/i, '').trim().toLowerCase();
+            const isGolemAutonomousCall = ctx && (ctx.isFromGolemAction === true || ctx.source === 'golem_action');
+            const AUTO_SWITCH_ALLOWLIST = new Set(['assistant', 'coding', 'research', 'creative', 'safe']);
 
             if (!subCmd || subCmd === 'list') {
                 return await reply(toolsetManager.listScenes());
@@ -719,6 +774,21 @@ class NodeRouter {
             }
 
             // 切換場景
+            if (isGolemAutonomousCall) {
+                if (subCmd === 'autonomy') {
+                    return await reply(
+                        '⛔ [Toolset Guard] Golem 自主流程不可直接切換到 `autonomy`。請先詢問使用者是否同意，並請使用者手動輸入 `/toolset autonomy`。'
+                    );
+                }
+                if (!AUTO_SWITCH_ALLOWLIST.has(subCmd)) {
+                    const hint = Array.from(AUTO_SWITCH_ALLOWLIST).join('、');
+                    return await reply(
+                        `⛔ [Toolset Guard] Golem 自主流程目前僅可自動切換：${hint}。` +
+                        `\n若需要切到 \`${subCmd}\`，請先詢問使用者同意後由使用者手動執行。`
+                    );
+                }
+            }
+
             const result = toolsetManager.switchScene(subCmd);
             if (result && result.success) {
                 const active = toolsetManager.getActiveScene();

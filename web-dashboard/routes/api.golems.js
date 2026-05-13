@@ -156,6 +156,75 @@ module.exports = function registerGolemRoutes(server) {
         return summary;
     }
 
+    function mergeMemoryDirectoryBestEffort(sourceRoot, targetRoot) {
+        const summary = { files: 0, directories: 0, bytes: 0, skipped: [] };
+        const maxSkippedDetails = 50;
+
+        function recordSkip(entryPath, error) {
+            const relativePath = toRelativeMemoryPath(sourceRoot, entryPath);
+            const reason = error && error.code ? error.code : (error && error.message) || 'UNKNOWN';
+            if (summary.skipped.length < maxSkippedDetails) {
+                summary.skipped.push({ path: relativePath, reason });
+            }
+            console.warn(`[WebServer] Memory merge skipped ${relativePath}: ${reason}`);
+        }
+
+        function mergeEntry(sourcePath, targetPath) {
+            let stat;
+            try {
+                stat = fs.lstatSync(sourcePath);
+            } catch (error) {
+                recordSkip(sourcePath, error);
+                return;
+            }
+
+            if (stat.isSymbolicLink()) {
+                recordSkip(sourcePath, { code: 'SYMLINK_SKIPPED' });
+                return;
+            }
+
+            if (stat.isDirectory()) {
+                try {
+                    fs.mkdirSync(targetPath, { recursive: true });
+                    summary.directories += 1;
+                } catch (error) {
+                    recordSkip(sourcePath, error);
+                    return;
+                }
+
+                let entries = [];
+                try {
+                    entries = fs.readdirSync(sourcePath, { withFileTypes: true });
+                } catch (error) {
+                    recordSkip(sourcePath, error);
+                    return;
+                }
+
+                for (const entry of entries) {
+                    mergeEntry(path.join(sourcePath, entry.name), path.join(targetPath, entry.name));
+                }
+                return;
+            }
+
+            if (!stat.isFile()) {
+                recordSkip(sourcePath, { code: 'UNSUPPORTED_ENTRY' });
+                return;
+            }
+
+            try {
+                fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+                fs.copyFileSync(sourcePath, targetPath);
+                summary.files += 1;
+                summary.bytes += stat.size;
+            } catch (error) {
+                recordSkip(sourcePath, error);
+            }
+        }
+
+        mergeEntry(sourceRoot, targetRoot);
+        return summary;
+    }
+
     function isWindowsPathLockedError(error) {
         return process.platform === 'win32'
             && error
@@ -178,6 +247,29 @@ module.exports = function registerGolemRoutes(server) {
         }
 
         return null;
+    }
+
+    function detectMemoryLockHints(memoryDir) {
+        const root = path.resolve(memoryDir);
+        const candidates = [
+            'SingletonLock',
+            'SingletonSocket',
+            'SingletonCookie',
+            'RunningChromeVersion',
+            path.join('Default', 'LOCK'),
+            path.join('Default', 'Network', 'Cookies'),
+        ];
+
+        const hits = [];
+        for (const rel of candidates) {
+            const full = path.join(root, rel);
+            try {
+                if (fs.existsSync(full)) hits.push(full);
+            } catch {
+                // ignore
+            }
+        }
+        return hits;
     }
 
     async function startTelegramPollingIfAvailable(instance, golemId, reason) {
@@ -478,35 +570,70 @@ module.exports = function registerGolemRoutes(server) {
             }
 
             let backupPath = null;
+            let mergeFallbackUsed = false;
+            let mergeSummary = null;
             if (fs.existsSync(targetMemoryDir) && !isDirectoryEmpty(targetMemoryDir)) {
                 backupPath = `${targetMemoryDir}.before-reincarnation-${Date.now()}`;
                 try {
                     fs.renameSync(targetMemoryDir, backupPath);
                 } catch (error) {
-                    fs.rmSync(tempTargetDir, { recursive: true, force: true });
                     const friendly = buildMemoryReplaceError(error, targetMemoryDir);
-                    if (friendly) return res.status(friendly.status).json(friendly.body);
-                    throw error;
+                    if (friendly) {
+                        console.warn('⚠️ [WebServer] Replace blocked by lock; fallback to in-place merge mode.');
+                        mergeFallbackUsed = true;
+                        mergeSummary = mergeMemoryDirectoryBestEffort(sourceMemoryDir, targetMemoryDir);
+                        fs.rmSync(tempTargetDir, { recursive: true, force: true });
+                    } else {
+                        fs.rmSync(tempTargetDir, { recursive: true, force: true });
+                        throw error;
+                    }
                 }
             } else if (fs.existsSync(targetMemoryDir)) {
                 try {
                     fs.rmSync(targetMemoryDir, { recursive: true, force: true });
                 } catch (error) {
-                    fs.rmSync(tempTargetDir, { recursive: true, force: true });
                     const friendly = buildMemoryReplaceError(error, targetMemoryDir);
-                    if (friendly) return res.status(friendly.status).json(friendly.body);
-                    throw error;
+                    if (friendly) {
+                        console.warn('⚠️ [WebServer] Empty-dir cleanup blocked by lock; fallback to in-place merge mode.');
+                        mergeFallbackUsed = true;
+                        mergeSummary = mergeMemoryDirectoryBestEffort(sourceMemoryDir, targetMemoryDir);
+                        fs.rmSync(tempTargetDir, { recursive: true, force: true });
+                    } else {
+                        fs.rmSync(tempTargetDir, { recursive: true, force: true });
+                        throw error;
+                    }
                 }
             }
 
-            try {
-                fs.renameSync(tempTargetDir, targetMemoryDir);
-            } catch (error) {
-                const friendly = buildMemoryReplaceError(error, targetMemoryDir);
-                if (friendly) return res.status(friendly.status).json(friendly.body);
-                throw error;
+            if (!mergeFallbackUsed) {
+                try {
+                    fs.renameSync(tempTargetDir, targetMemoryDir);
+                } catch (error) {
+                    const friendly = buildMemoryReplaceError(error, targetMemoryDir);
+                    if (friendly) {
+                        console.warn('⚠️ [WebServer] Final rename blocked by lock; fallback to in-place merge mode.');
+                        mergeFallbackUsed = true;
+                        mergeSummary = mergeMemoryDirectoryBestEffort(sourceMemoryDir, targetMemoryDir);
+                        fs.rmSync(tempTargetDir, { recursive: true, force: true });
+                    } else {
+                        throw error;
+                    }
+                }
             }
             console.log(`🧬 [WebServer] Memory reincarnated from ${sourceMemoryDir} to ${targetMemoryDir}`);
+
+            const lockHints = detectMemoryLockHints(targetMemoryDir);
+            const effectiveSummary = mergeFallbackUsed && mergeSummary
+                ? {
+                    mode: 'merge-fallback',
+                    copiedFromTemp: summary,
+                    mergedInPlace: mergeSummary,
+                    skipped: [...summary.skipped, ...mergeSummary.skipped].slice(0, 50),
+                }
+                : {
+                    mode: 'replace',
+                    ...summary,
+                };
 
             return res.json({
                 success: true,
@@ -514,10 +641,13 @@ module.exports = function registerGolemRoutes(server) {
                 targetPath: targetMemoryDir,
                 backupPath,
                 quiesceReport,
-                summary,
-                warning: summary.skipped.length > 0
-                    ? '部分檔案因權限或特殊檔案類型無法複製，已跳過；可讀取的記憶已完成轉生。'
-                    : '部分舊版技能、腳本或瀏覽器狀態可能無法完全相容新專案。'
+                summary: effectiveSummary,
+                lockHints,
+                warning: mergeFallbackUsed
+                    ? '偵測到 Windows/瀏覽器鎖定，已改用就地合併模式完成轉生；少數被鎖檔案可能略過，可關閉瀏覽器後再重試以補齊。'
+                    : summary.skipped.length > 0
+                        ? '部分檔案因權限或特殊檔案類型無法複製，已跳過；可讀取的記憶已完成轉生。'
+                        : '部分舊版技能、腳本或瀏覽器狀態可能無法完全相容新專案。'
             });
         } catch (e) {
             console.error('[WebServer] Failed to import reincarnated memory:', e);

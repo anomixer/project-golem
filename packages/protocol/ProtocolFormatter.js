@@ -308,6 +308,13 @@ Your response must be strictly divided into these 3 sections:
 ${maxResponseWords > 0 ? `- Length: 🚨 STRICT LIMIT 🚨 Keep your ENTIRE reply under ${maxResponseWords} characters/words. Be extremely concise.` : ''}
 - 📝 **MENTION RULE**: 當需要提及 (@mention) 或詢問群組中的使用者時，請直接在文字回覆中使用 @userid。
 - 🚫 **BOUNDARY**: 嚴禁將當前平台通訊（Telegram/Discord）視為外部 \`moltbot\` 任務處理。
+- 🔗 **SOURCE LINK RULE (MANDATORY FOR SEARCH/FACT TASKS)**:
+  - 若本回覆包含查詢、事實、新聞、網頁資訊，必須在結尾附上「參考來源」清單，格式：
+    - 參考來源：
+    - 1. 標題 - https://example.com
+    - 2. 標題 - https://example.org
+  - 來源連結必須可直接點擊（完整 https URL）。
+  - 不得捏造來源或網址；若無可公開來源，明確寫：參考來源：本次操作無可公開連結來源（僅本地資料/工具輸出）。
 
 [GOLEM_ACTION]
 - 🚨 **MANDATORY**: YOU MUST USE MARKDOWN JSON CODE BLOCKS!

@@ -92,44 +92,62 @@ class TaskController {
             if (!cmdToRun && shouldAssembleSkill) {
                 const actionName = String(step.action).toLowerCase().replace(/_/g, '-');
                 const { action, ...params } = step;
-
-                const fs = require('fs');
-                const path = require('path');
-                const SkillPackageRegistry = require('../managers/SkillPackageRegistry');
-                const skillPackage = SkillPackageRegistry.listSkillPackages()
-                    .find(pkg => pkg.id === actionName || pkg.action === actionName);
-                const skillPath = skillPackage && fs.existsSync(skillPackage.indexPath)
-                    ? skillPackage.indexPath
-                    : path.join(process.cwd(), 'src/skills/core', `${actionName}.js`);
-
-                if (fs.existsSync(skillPath)) {
-                    let payloadObj = params;
-                    if (params.parameters && typeof params.parameters === 'object') {
-                        payloadObj = params.parameters; // 去除多層嵌套，方便腳本解析
-                    } else if (typeof params.parameters === 'string') {
-                        payloadObj = { command: params.parameters };
-                    }
-                    const payload = shellQuote(JSON.stringify(payloadObj));
-                    const relativeSkillPath = path.relative(process.cwd(), skillPath);
-                    cmdToRun = `node ${relativeSkillPath} ${payload}`;
-                    console.log(`🔧 [TaskController] 自動組裝技能指令: ${cmdToRun}`);
+                if (actionName === 'toolset') {
+                    const rawSub =
+                        params.scene ||
+                        params.mode ||
+                        params.target ||
+                        params.toolset ||
+                        params.command ||
+                        params.parameter ||
+                        (params.args && (params.args.scene || params.args.mode || params.args.target || params.args.toolset || params.args.command || params.args.parameter)) ||
+                        '';
+                    const sub = String(rawSub || '').trim();
+                    cmdToRun = sub ? `/toolset ${sub}` : '/toolset status';
+                    console.log(`🔧 [TaskController] toolset action bridge -> ${cmdToRun}`);
+                }
+                if (cmdToRun) {
+                    // 已橋接成 slash 指令，交給後續 slash 攔截流程
                 } else {
-                    console.warn(`⚠️ [TaskController] 找不到實體技能檔: ${skillPath}`);
-                    const sampleSkills = SkillPackageRegistry.listSkillPackages()
-                        .map(pkg => String(pkg && (pkg.action || pkg.id) || '').trim())
-                        .filter(Boolean)
-                        .slice(0, 3);
-                    const sampleSkill = sampleSkills[0] || 'wiki';
-                    const helpLines = [
-                        `⛔ [系統攔截] 找不到實體技能檔: ${skillPath}`,
-                        `你使用的 action: ${actionName}`,
-                        `請改用正確格式：`,
-                        `1) 技能：{"action":"${sampleSkill}","args":{"input":"..."}}`,
-                        `2) MCP：{"action":"mcp_call","server":"chrome-devtools","tool":"navigate_page","parameters":{"url":"https://example.com"}}`,
-                        `3) 指令：{"action":"command","parameter":"ls -la"}`,
-                        `提示：先輸入 /skills 查看可用技能。`
-                    ];
-                    cmdToRun = `echo ${shellQuote(helpLines.join('\n'))}`;
+
+                    const fs = require('fs');
+                    const path = require('path');
+                    const SkillPackageRegistry = require('../managers/SkillPackageRegistry');
+                    const skillPackage = SkillPackageRegistry.listSkillPackages()
+                        .find(pkg => pkg.id === actionName || pkg.action === actionName);
+                    const skillPath = skillPackage && fs.existsSync(skillPackage.indexPath)
+                        ? skillPackage.indexPath
+                        : path.join(process.cwd(), 'src/skills/core', `${actionName}.js`);
+
+                    if (fs.existsSync(skillPath)) {
+                        let payloadObj = params;
+                        if (params.parameters && typeof params.parameters === 'object') {
+                            payloadObj = params.parameters; // 去除多層嵌套，方便腳本解析
+                        } else if (typeof params.parameters === 'string') {
+                            payloadObj = { command: params.parameters };
+                        }
+                        const payload = shellQuote(JSON.stringify(payloadObj));
+                        const relativeSkillPath = path.relative(process.cwd(), skillPath);
+                        cmdToRun = `node ${relativeSkillPath} ${payload}`;
+                        console.log(`🔧 [TaskController] 自動組裝技能指令: ${cmdToRun}`);
+                    } else {
+                        console.warn(`⚠️ [TaskController] 找不到實體技能檔: ${skillPath}`);
+                        const sampleSkills = SkillPackageRegistry.listSkillPackages()
+                            .map(pkg => String(pkg && (pkg.action || pkg.id) || '').trim())
+                            .filter(Boolean)
+                            .slice(0, 3);
+                        const sampleSkill = sampleSkills[0] || 'wiki';
+                        const helpLines = [
+                            `⛔ [系統攔截] 找不到實體技能檔: ${skillPath}`,
+                            `你使用的 action: ${actionName}`,
+                            `請改用正確格式：`,
+                            `1) 技能：{"action":"${sampleSkill}","args":{"input":"..."}}`,
+                            `2) MCP：{"action":"mcp_call","server":"chrome-devtools","tool":"navigate_page","parameters":{"url":"https://example.com"}}`,
+                            `3) 指令：{"action":"command","parameter":"ls -la"}`,
+                            `提示：先輸入 /skills 查看可用技能。`
+                        ];
+                        cmdToRun = `echo ${shellQuote(helpLines.join('\n'))}`;
+                    }
                 }
             }
             // ── Golem 內建斜線指令攔截 ──────────────────────────────
@@ -141,7 +159,12 @@ class TaskController {
                 console.log(`🔀 [TaskController] Golem 內建指令攔截: ${cmdToRun}`);
                 try {
                     const activeBrain = brain || ctx.brain || null;
-                    const result = await NodeRouter.handle({ text: cmdToRun, isAdmin: true }, activeBrain);
+                    const result = await NodeRouter.handle({
+                        text: cmdToRun,
+                        isAdmin: true,
+                        isFromGolemAction: true,
+                        source: 'golem_action',
+                    }, activeBrain);
                     const output = result || '（指令已執行，無輸出）';
                     reportBuffer.push(`[Step ${i + 1} Success] cmd: ${cmdToRun}\nResult:\n${output}`);
                 } catch (e) {
