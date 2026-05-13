@@ -26,6 +26,7 @@ const MANDATORY_SKILLS = [
     'reference-files',
     'stock-dashboard',
     'collab-calendar',
+    'chrome-devtools',
 ];
 
 const OPTIONAL_SKILLS = [
@@ -37,7 +38,6 @@ const OPTIONAL_SKILLS = [
     // ── 其他選用技能 ──────────────────────────────────────────
     'apple-calendar',   // 🍎 macOS Apple Calendar 整合（僅 macOS）
     'delegate-task',    // 🤝 任務委派
-    'chrome-devtools',  // 🔧 Chrome DevTools 整合（需 MCP）
 ];
 
 /**

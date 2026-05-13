@@ -2,7 +2,7 @@ const skillManager = require('./SkillManager');
 const SkillPackageRegistry = require('./SkillPackageRegistry');
 const { toolsetManager, SCENE_TOOLSETS } = require('./ToolsetManager');
 
-const BUILTIN_ACTIONS = new Set(['command', 'mcp_call', 'multi_agent']);
+const BUILTIN_ACTIONS = new Set(['command', 'mcp_call', 'multi_agent', 'toolset']);
 const DEPRECATED_SCHEDULE_ACTIONS = new Set(['schedule', 'list-schedules']);
 
 function normalizeActionName(value) {
@@ -116,6 +116,9 @@ class ActionExecutionGate {
         }
 
         if (BUILTIN_ACTIONS.has(normalizedAction)) {
+            if (normalizedAction === 'toolset') {
+                return { ok: true, lane: 'framework', normalizedAction: 'toolset' };
+            }
             return { ok: true, lane: 'framework', normalizedAction };
         }
 
@@ -129,10 +132,13 @@ class ActionExecutionGate {
 
         const skill = findSkillByAction(normalizedAction);
         if (!skill) {
+            const scenes = Object.keys(SCENE_TOOLSETS || {}).join(', ');
             return {
                 ok: false,
                 code: 'UNKNOWN_ACTION',
-                error: `Unknown action "${normalizedAction}". Use command / mcp_call / multi_agent / installed skill action.`,
+                error: `Unknown action "${normalizedAction}". Use command / mcp_call / multi_agent / toolset / installed skill action. ` +
+                    `Toolset example: {"action":"toolset","args":{"scene":"research"}}. Available scenes: ${scenes}. ` +
+                    `You can also use slash: /toolset list`,
             };
         }
 

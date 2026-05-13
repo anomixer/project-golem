@@ -1,4 +1,5 @@
 const skillManager = require('../../managers/SkillManager');
+const { SCENE_TOOLSETS } = require('../../managers/ToolsetManager');
 const MCPManager   = require('../../mcp/MCPManager');
 const MCPCallValidator = require('../../mcp/MCPCallValidator');
 const MCPToolCatalog = require('../../mcp/MCPToolCatalog');
@@ -109,6 +110,8 @@ class SkillHandler {
             .slice(0, 3);
         const suggestionPool = similar.length > 0 ? similar : top.slice(0, 3);
         const exampleSkill = suggestionPool[0] || top[0] || 'wiki';
+        const scenes = Object.keys(SCENE_TOOLSETS || {});
+        const sceneHint = scenes.length > 0 ? scenes.join(', ') : 'assistant, coding, research, creative, safe, autonomy';
 
         return [
             `❌ 找不到技能 action: "${skillName}"`,
@@ -116,6 +119,8 @@ class SkillHandler {
             `1) 技能呼叫：{"action":"${exampleSkill}","args":{"input":"..."}}`,
             `2) MCP 工具：{"action":"mcp_call","server":"chrome-devtools","tool":"navigate_page","parameters":{"url":"https://example.com"}}`,
             `3) Shell 指令：{"action":"command","parameter":"ls -la"}`,
+            `4) 切換場景：{"action":"toolset","args":{"scene":"research"}} 或 /toolset research`,
+            `可用場景：${sceneHint}（用 /toolset list 可查看清單）`,
             `可先輸入 /skills 查看目前可用技能。`,
         ].join('\n');
     }
@@ -150,6 +155,7 @@ class SkillHandler {
                 `限制：\n` +
                 `- 你現在處於 observation_summary 模式。\n` +
                 `- 請只使用 [GOLEM_REPLY] 整理結果給使用者。\n` +
+                `- 若回覆涉及查詢結果/事實資訊，請在結尾附「參考來源」清單並提供可點擊 https 連結；若無公開來源，明確寫「參考來源：本次操作無可公開連結來源（僅本地資料/工具輸出）。」。\n` +
                 `${actionRule}\n\n` +
                 `工具結果：\n${fullMessage}`;
             if (convoManager) {
