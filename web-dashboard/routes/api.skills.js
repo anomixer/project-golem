@@ -6,6 +6,7 @@ const { ProtocolFormatter } = require('../../packages/protocol');
 const { buildOperationGuard } = require('../server/security');
 const { resolveActiveContext } = require('./utils/context');
 const SkillPackageRegistry = require('../../src/managers/SkillPackageRegistry');
+const REMOVED_SKILL_IDS = new Set(['schedule', 'list-schedules']);
 
 function extractSkillTitle(record) {
     const content = String(record.content || '');
@@ -28,6 +29,7 @@ function extractSkillTitle(record) {
 function normalizeSkillRecord(record, enabledSkills) {
     const id = String(record.id || '').trim().toLowerCase();
     if (!id) return null;
+    if (REMOVED_SKILL_IDS.has(id)) return null;
 
     const category = String(record.category || 'lib').trim().toLowerCase();
     const isDynamic = category === 'user_dynamic' || category === 'runtime' || category === 'runtime_user';
@@ -285,7 +287,8 @@ async function collectInstalledSkills(server, golemIdQuery) {
         }
     }
 
-    const skillsData = Array.from(skillsMap.values());
+    const skillsData = Array.from(skillsMap.values())
+        .filter((item) => !REMOVED_SKILL_IDS.has(String(item && item.id || '').toLowerCase()));
     skillsData.sort((a, b) => {
         if (a.isEnabled && !b.isEnabled) return -1;
         if (!a.isEnabled && b.isEnabled) return 1;

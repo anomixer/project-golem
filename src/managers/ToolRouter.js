@@ -48,7 +48,7 @@ function inferIntentBoosts(text) {
     add(/(browser|chrome|devtools|網頁|頁面|點擊|輸入|表單|console|network|lighthouse|截圖|瀏覽器)/i, ['chrome-devtools']);
     add(/(git|commit|branch|diff|pull request|pr|版本|分支)/i, ['git']);
     add(/(記憶|memory|回憶|以前|之前|歷史|找對話|搜尋對話)/i, ['memory', 'session-search']);
-    add(/(排程|提醒|schedule|定時|每天|明天|下週|cron)/i, ['chronos', 'schedule', 'list-schedules']);
+    add(/(排程|提醒|schedule|定時|每天|明天|下週|cron)/i, ['chronos', 'collab-calendar']);
     add(/(行程|行事曆|日曆|calendar|今天有什麼|明天有什麼|這週|下週|新增行程|加入行程|排行程|有什麼約|約了什麼|協作日曆)/i, ['collab-calendar']);
     add(/(圖片|影像|畫圖|生成圖|image|prompt)/i, ['image-prompt']);
     add(/(youtube|影片|字幕)/i, ['youtube']);
