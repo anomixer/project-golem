@@ -147,17 +147,6 @@ REMOTE_ACCESS_PASSWORD=
 SYSTEM_OP_TOKEN=
 ```
 
-### 內建 SearXNG 搜尋 MCP
-
-專案已內建 `searxng` MCP server（`src/mcp/searxng_stdio.js`），安裝完成即可在 Dashboard 的 MCP 頁看到並啟用。
-
-```env
-SEARXNG_BASE_URLS=http://127.0.0.1:8080,http://localhost:8080,https://searx.be
-```
-
-- 建議把你自架的 SearXNG 放在最前面（優先嘗試）。
-- Docker Compose 模式預設會啟動 `searxng` service（port `8080`），Golem 會自動帶入 `http://searxng:8080`。
-
 若把 `ALLOW_REMOTE_ACCESS` 設為 `true`，請務必設定強密碼，並搭配防火牆、VPN 或反向代理權限控管。
 
 ### Telegram / Discord
