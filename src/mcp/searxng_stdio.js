@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+"use strict";
+"use strict";
+#!/usr/bin/env node
 /* eslint-disable no-console */
 
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -143,7 +146,8 @@ function toolList() {
 }
 
 function write(message) {
-    process.stdout.write(`${JSON.stringify(message)}\n`);
+    process.stdout.write(`${JSON.stringify(message)}
+`);
 }
 
 async function onRequest(req) {
@@ -212,7 +216,8 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data', async (chunk) => {
     buffer += chunk;
     while (true) {
-        const idx = buffer.indexOf('\n');
+        const idx = buffer.indexOf('
+');
         if (idx === -1) break;
         const line = buffer.slice(0, idx).trim();
         buffer = buffer.slice(idx + 1);
