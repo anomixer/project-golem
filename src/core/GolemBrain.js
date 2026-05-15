@@ -280,7 +280,9 @@ class GolemBrain {
                 if (forceReload || !bootInjected) {
                     const stageStart = Date.now();
                     this._apiBootInjected[this.backend] = true;
-                    await this._injectSystemPrompt(forceReload);
+                    await this._injectSystemPrompt(forceReload, {
+                        onProgress: this._startupProgressReporter || null,
+                    });
                     this._markInitSegment(metrics, 'system_prompt_injection', stageStart);
                 } else {
                     metrics.segments.system_prompt_injection = 0;
@@ -385,7 +387,9 @@ class GolemBrain {
             // 6. 新會話: 注入系統 Prompt
             if (forceReload || isNewSession) {
                 const stageStart = Date.now();
-                await this._injectSystemPrompt(forceReload);
+                await this._injectSystemPrompt(forceReload, {
+                    onProgress: this._startupProgressReporter || null,
+                });
                 this._markInitSegment(metrics, 'system_prompt_injection', stageStart);
             } else {
                 metrics.segments.system_prompt_injection = 0;
@@ -789,6 +793,7 @@ class GolemBrain {
         const chunks = this._splitTextIntoChunks(text, maxSegmentChars);
         const sessionId = ProtocolFormatter.generateReqId().replace('REQ-', 'SEG-');
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+        const maxAckRetry = Number(options.maxAckRetry || 1);
         let lastResult = { text: '', attachments: [] };
 
         for (let i = 0; i < chunks.length; i++) {
@@ -811,10 +816,34 @@ class GolemBrain {
                     : '以上為最後一段，請根據全部段落內容再正式回覆。',
             ].join('\n');
 
-            lastResult = await this.sendMessage(segmentMessage, isSystem, {
-                ...options,
-                _segmentedBypass: true,
-            });
+            let attempt = 0;
+            while (attempt <= maxAckRetry) {
+                lastResult = await this.sendMessage(segmentMessage, isSystem, {
+                    ...options,
+                    _segmentedBypass: true,
+                });
+                // 非最後一段：必須收到 ACK 才允許下一段
+                if (i >= chunks.length - 1) break;
+                const ackText = String(lastResult?.text || '').trim();
+                const ackOk = /\bACK\b/i.test(ackText) || /(已讀|已讀取|收到|了解|read)/i.test(ackText);
+                if (ackOk) {
+                    if (onProgress) {
+                        try {
+                            await onProgress({
+                                phase: 'segment_ack',
+                                sessionId,
+                                segmentIndex: i + 1,
+                                segmentTotal: chunks.length,
+                            });
+                        } catch (_) { }
+                    }
+                    break;
+                }
+                attempt += 1;
+                if (attempt > maxAckRetry) {
+                    throw new Error(`Segment ACK missing at ${i + 1}/${chunks.length}`);
+                }
+            }
         }
 
         return lastResult;
@@ -1261,8 +1290,14 @@ class GolemBrain {
      * 供 Dashboard 的「注入技能書」按鈕使用
      * ✅ [需求變更] 依據使用者要求，禁止即時熱注入，改為「重新開啟 Gemini 對話視窗」後再注入
      */
-    async reloadSkills() {
+    async reloadSkills(options = {}) {
+        const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+        const report = async (payload) => {
+            if (!onProgress) return;
+            try { await onProgress(payload); } catch (_) { }
+        };
         // 1. 設定熱重載：從 .env 重新讀取配置 (包含 API Key, 模式, 選用技能等)
+        await report({ phase: 'reload_config', progress: 10, message: '重新載入設定...' });
         console.log(`🔄 [Brain][${this.golemId}] 正在執行設定熱重載 (Config Reload)...`);
         ConfigManager.reloadConfig();
         this.backend = ConfigManager.CONFIG.GOLEM_BACKEND || this.backend || 'gemini';
@@ -1271,6 +1306,7 @@ class GolemBrain {
         }
 
         // 2. 技能同步：依據最新設定同步 SQLite 索引
+        await report({ phase: 'sync_skill_index', progress: 25, message: '同步技能索引...' });
         console.log(`📡 [Brain][${this.golemId}] 正在同步技能索引 (Skill Sync)...`);
         try {
             const personaManager = require('../skills/core/persona');
@@ -1287,11 +1323,13 @@ class GolemBrain {
 
         // 3. 清除 ProtocolFormatter 快取，讓下次 build 時重新掃描
         ProtocolFormatter._lastScanTime = 0;
+        await report({ phase: 'prepare_injection', progress: 35, message: '準備重新注入初始提示詞...' });
         console.log(`🔄 [Brain][${this.golemId}] 協議快取已清除，開始重新開啟對話視窗並注入...`);
 
         if (this._isApiBackend()) {
-            await this._injectSystemPrompt(true);
+            await this._injectSystemPrompt(true, { onProgress });
             console.log(`✅ [Brain][${this.golemId}] ${this._getApiBackendLabel()} 技能注入流程完成。`);
+            await report({ phase: 'done', progress: 100, message: '注入完成。' });
             return;
         }
 
@@ -1306,15 +1344,26 @@ class GolemBrain {
         const targetBackend = this.backend === 'perplexity' ? 'perplexity' : 'gemini';
         await this._navigateToTarget(targetBackend);
 
-        await this._injectSystemPrompt(true);
+        await this._injectSystemPrompt(true, { onProgress });
         console.log(`✅ [Brain][${this.golemId}] 完整重啟流程執行完畢 (Config + Skill + Protocol)。`);
+        await report({ phase: 'done', progress: 100, message: '注入完成。' });
     }
 
     /**
      * 組裝並發送系統 Prompt
      * @param {boolean} [forceRefresh=false]
      */
-    async _injectSystemPrompt(forceRefresh = false) {
+    async _injectSystemPrompt(forceRefresh = false, options = {}) {
+        const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+        const report = async (payload) => {
+            if (!onProgress) return;
+            try { await onProgress(payload); } catch (_) { }
+        };
+        const systemInjectSegmentChars = (() => {
+            const raw = Number(process.env.GOLEM_SYSTEM_INJECT_SEGMENT_CHARS || 8000);
+            if (!Number.isFinite(raw) || raw < 2000) return 8000;
+            return Math.min(raw, 12000);
+        })();
         const toolsetContext = this._resolveToolsetContext();
         let { systemPrompt, skillMemoryText } = await ProtocolFormatter.buildSystemPrompt(forceRefresh, {
             userDataDir: this.userDataDir,
@@ -1328,11 +1377,20 @@ class GolemBrain {
             console.log(`🧠 [Memory] 已成功將技能載入長期記憶中！`);
         }
 
+        await report({ phase: 'wiki_injection', progress: 45, message: '注入 Wiki 與知識上下文...' });
         // 📖 [第零階段 Phase 0] Wiki 知識庫注入 (最高密度先驗知識)
         try {
             const wikiContext = this.wikiManager.getInjectionContext();
             if (wikiContext) {
-                await this.sendMessage(wikiContext, false, { disableToolRouting: true });
+                if (wikiContext.length > systemInjectSegmentChars) {
+                    await this.sendMessageSegmented(wikiContext, false, {
+                        disableToolRouting: true,
+                        maxSegmentChars: systemInjectSegmentChars,
+                        onProgress,
+                    });
+                } else {
+                    await this.sendMessage(wikiContext, false, { disableToolRouting: true });
+                }
                 console.log(`📖 [Brain] Phase 0：Wiki 知識庫已注入 (${wikiContext.length} 字元)`);
             } else {
                 console.log(`ℹ️ [Brain] Phase 0：Wiki 尚無頁面，跳過注入。`);
@@ -1341,6 +1399,7 @@ class GolemBrain {
             console.warn(`⚠️ [Brain] Wiki 知識庫注入失敗: ${e.message}`);
         }
 
+        await report({ phase: 'learning_injection', progress: 60, message: '注入自學規則...' });
         // 🧠 [第零階段 Phase 0.5] 顯性學習規則庫注入
         try {
             const learningsPath = path.join(this.userDataDir, 'learnings.json');
@@ -1352,7 +1411,15 @@ class GolemBrain {
                     const recentLearnings = learnings.slice(-15);
                     const learningsText = recentLearnings.map(l => `- [${l.category}] ${l.content}`).join('\n');
                     const injectionText = `【系統補充：你的自學知識庫 (提取自 learnings.json)】\n以下是你過去自我學習記錄的最佳實踐與規則，請在後續任務中嚴格遵守這些適應性學習經驗：\n${learningsText}`;
-                    await this.sendMessage(injectionText, false, { disableToolRouting: true });
+                    if (injectionText.length > systemInjectSegmentChars) {
+                        await this.sendMessageSegmented(injectionText, false, {
+                            disableToolRouting: true,
+                            maxSegmentChars: systemInjectSegmentChars,
+                            onProgress,
+                        });
+                    } else {
+                        await this.sendMessage(injectionText, false, { disableToolRouting: true });
+                    }
                     console.log(`🧠 [Brain] Phase 0.5：自適應學習知識庫已注入 (${recentLearnings.length} 條規則)`);
                 }
             }
@@ -1360,10 +1427,21 @@ class GolemBrain {
             console.warn(`⚠️ [Brain] 自適應學習知識庫注入失敗: ${e.message}`);
         }
 
+        await report({ phase: 'system_prompt_injection', progress: 75, message: '注入初始提示詞...' });
         // 🚀 [第一階段] 發送底層系統協議 (不含歷史摘要)
         const compressedPrompt = ProtocolFormatter.compress(systemPrompt);
-        await this.sendMessage(compressedPrompt, false, { disableToolRouting: true }); // ⚡ 改為 false：等待完整回應
-        console.log(`📡 [Brain] 階段一：底層協議注入完成 (${this.backend.toUpperCase()})。`);
+        if (compressedPrompt.length > systemInjectSegmentChars) {
+            console.log(`📡 [Brain] 階段一：系統協議長度 ${compressedPrompt.length}，啟用分段注入 (${systemInjectSegmentChars}/段)。`);
+            await this.sendMessageSegmented(compressedPrompt, false, {
+                disableToolRouting: true,
+                maxSegmentChars: systemInjectSegmentChars,
+                onProgress,
+            });
+        } else {
+            await this.sendMessage(compressedPrompt, false, { disableToolRouting: true }); // ⚡ 改為 false：等待完整回應
+        }
+        console.log(`📡 [Brain] 階段一：底層協議注入完成 (${this.backend.toUpperCase()}, chars=${compressedPrompt.length})。`);
+        await report({ phase: 'system_prompt_done', progress: 90, message: '初始提示詞注入完成，整理記憶中...' });
 
         if (this._disableHistoricalMemoryInjection) {
             console.log(`⏭️ [Brain] 階段二：此代理設定為短生命週期，略過歷史記憶注入。`);
@@ -1372,6 +1450,7 @@ class GolemBrain {
 
         // 🧠 [第二階段] 金字塔式多層記憶注入（改為背景排程，不阻塞 init）
         this._scheduleHistoricalMemoryInjection();
+        await report({ phase: 'historical_memory_scheduled', progress: 95, message: '已排程歷史記憶注入...' });
     }
 
     _scheduleHistoricalMemoryInjection() {
