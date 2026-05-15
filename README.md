@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/logo.png" width="320" alt="Project Golem Logo" />
-  <h1>Project Golem v9.5</h1>
+  <h1>Project Golem v9.６</h1>
   <p><strong>可長期陪跑的自主 AI 代理系統：Web Gemini、Ollama、LM Studio、多代理、技能、記憶與 Web Dashboard。</strong></p>
 
   <p>
