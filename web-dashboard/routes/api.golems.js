@@ -682,8 +682,20 @@ module.exports = function registerGolemRoutes(server) {
     });
 
     router.post('/api/golems/setup', requireGolemOps, async (req, res) => {
-        const { golemId, aiName, userName, currentRole, tone, skills } = req.body;
+        const { golemId, aiName, userName, currentRole, tone, skills, operationId } = req.body;
         if (!golemId) return res.status(400).json({ error: 'Missing golemId' });
+        const emitSetupProgress = (payload = {}) => {
+            try {
+                if (server && server.io && typeof server.io.emit === 'function') {
+                    server.io.emit('setup:inject_progress', {
+                        golemId,
+                        operationId: operationId || null,
+                        ts: Date.now(),
+                        ...payload,
+                    });
+                }
+            } catch (_) {}
+        };
 
         let context = server.contexts.get(golemId);
 
@@ -707,6 +719,7 @@ module.exports = function registerGolemRoutes(server) {
         }
 
         try {
+            emitSetupProgress({ phase: 'setup_start', progress: 5, message: '初始化啟動流程...' });
             const personaManager = require('../../src/skills/core/persona');
             personaManager.save(context.brain.userDataDir, {
                 aiName: aiName || 'Golem',
@@ -719,22 +732,36 @@ module.exports = function registerGolemRoutes(server) {
 
             context.brain.status = 'running';
             server.isBooting = true;
+            context.brain._startupProgressReporter = async (progressPayload = {}) => {
+                emitSetupProgress({
+                    phase: progressPayload.phase || 'injecting',
+                    progress: Number(progressPayload.progress || 0),
+                    message: progressPayload.message || '初始提示詞注入中...',
+                    segmentIndex: progressPayload.segmentIndex || null,
+                    segmentTotal: progressPayload.segmentTotal || null,
+                });
+            };
 
             (async () => {
                 try {
                     try {
+                        emitSetupProgress({ phase: 'brain_init', progress: 15, message: '啟動核心與瀏覽器...' });
                         await context.brain.init();
+                        emitSetupProgress({ phase: 'brain_init_done', progress: 96, message: '核心啟動完成，收尾中...' });
                     } catch (err) {
                         console.error(`Failed to initialize Golem [${golemId}] after setup; keeping Telegram polling alive:`, err);
                         context.brain.status = 'error';
+                        emitSetupProgress({ phase: 'error', progress: 100, message: `啟動失敗：${err.message || String(err)}` });
                     }
                     await startTelegramPollingIfAvailable(context, golemId, 'setup');
 
                     if (context.autonomy && typeof context.autonomy.start === 'function') {
                         context.autonomy.start();
                     }
+                    emitSetupProgress({ phase: 'done', progress: 100, message: '初始提示詞注入完成，Golem 已可使用。' });
                 } finally {
                     server.isBooting = false;
+                    context.brain._startupProgressReporter = null;
                     console.log(`✅ [WebServer] Setup complete for ${golemId}. Dashboard is ready.`);
                 }
             })();

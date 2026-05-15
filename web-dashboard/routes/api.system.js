@@ -8,6 +8,7 @@ const { resolveEnabledSkills } = require('../../src/skills/skillsConfig');
 const OllamaClient = require('../../src/services/OllamaClient');
 const LMStudioClient = require('../../src/services/LMStudioClient');
 const { buildOperationGuard, auditSecurityEvent } = require('../server/security');
+const { buildBackupPayload, previewRestoreBackupPayload, restoreBackupPayload } = require('../../src/services/SystemBackupService');
 
 function normalizeMemoryMode(modeRaw) {
     const mode = String(modeRaw || '').trim().toLowerCase();
@@ -52,6 +53,7 @@ module.exports = function registerSystemRoutes(server) {
     const requireRestart = buildOperationGuard(server, 'system_restart');
     const requireReload = buildOperationGuard(server, 'system_reload');
     const requireShutdown = buildOperationGuard(server, 'system_shutdown');
+    const requireSystemBackup = buildOperationGuard(server, 'system_config_update');
 
     router.get('/api/system/status', (req, res) => {
         try {
@@ -452,6 +454,68 @@ module.exports = function registerSystemRoutes(server) {
         } catch (e) {
             console.error('[WebServer] Update check failed:', e);
             return res.status(500).json({ error: e.message });
+        }
+    });
+
+    router.get('/api/system/backup/export', requireSystemBackup, async (req, res) => {
+        try {
+            const EnvManager = require('../../src/utils/EnvManager');
+            const ConfigManager = require('../../src/config/index');
+            const envVars = EnvManager.readEnv();
+            let appVersion = 'unknown';
+            try {
+                const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'));
+                appVersion = pkg.version || 'unknown';
+            } catch { }
+
+            const payload = buildBackupPayload({
+                appVersion,
+                memoryBaseDir: path.resolve(ConfigManager.MEMORY_BASE_DIR),
+                repoRoot: process.cwd(),
+                envSnapshot: envVars
+            });
+
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `golem-backup-${stamp}.json`;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            return res.send(JSON.stringify(payload, null, 2));
+        } catch (e) {
+            console.error('[WebServer] Failed to export system backup:', e);
+            return res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    router.post('/api/system/backup/restore', requireSystemBackup, async (req, res) => {
+        try {
+            const ConfigManager = require('../../src/config/index');
+            const payload = req.body?.payload || req.body;
+            const summary = restoreBackupPayload(payload, {
+                memoryBaseDir: path.resolve(ConfigManager.MEMORY_BASE_DIR),
+                repoRoot: process.cwd()
+            });
+            return res.json({
+                success: true,
+                message: 'Backup restore completed.',
+                summary
+            });
+        } catch (e) {
+            console.error('[WebServer] Failed to restore system backup:', e);
+            return res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    router.post('/api/system/backup/restore/preview', requireSystemBackup, async (req, res) => {
+        try {
+            const payload = req.body?.payload || req.body;
+            const preview = previewRestoreBackupPayload(payload);
+            return res.json({
+                success: true,
+                preview
+            });
+        } catch (e) {
+            console.error('[WebServer] Failed to preview system backup restore:', e);
+            return res.status(500).json({ success: false, error: e.message });
         }
     });
 

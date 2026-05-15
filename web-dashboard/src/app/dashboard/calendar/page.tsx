@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarDays, ChevronLeft, ChevronRight, Download, ExternalLink,
-  Loader2, Plus, RefreshCcw, Settings, Trash2, Upload, X, Check,
+  Loader2, Plus, RefreshCcw, Settings, Trash2, Upload, X, Check, CircleHelp,
   AlertCircle, LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -544,6 +544,51 @@ function EventModal({
   );
 }
 
+// ─── Usage Help Modal ───────────────────────────────────────────────────────
+
+function UsageHelpModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">協作日曆使用說明</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary/60 text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">快速上手</h3>
+          <p className="text-sm text-muted-foreground">先按「新增」建立行程，填好標題、開始時間、結束時間後儲存即可。</p>
+          <p className="text-sm text-muted-foreground">已建立的行程可以點一下編輯，也可以直接拖拉到其他日期或時段。</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">怎麼開啟同步</h3>
+          <p className="text-sm text-muted-foreground">右上角按「設定」，就可以看到 Google 與 Apple 的同步設定。</p>
+          <p className="text-sm text-muted-foreground">Google：先完成授權，再按同步即可把行程拉進來或推送出去。</p>
+          <p className="text-sm text-muted-foreground">Apple：選好要同步的日曆，勾選啟用後可立即手動同步，也可設定自動同步時間。</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">自動同步規則</h3>
+          <p className="text-sm text-muted-foreground">你新增、修改、刪除行程後，系統會自動嘗試同步。</p>
+          <p className="text-sm text-muted-foreground">Apple 也可依你設定的每日時間或固定間隔自動同步。</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">使用小提醒</h3>
+          <p className="text-sm text-muted-foreground">如果看不到最新行程，先按工具列的重新整理，再到設定裡看「上次同步狀態」。</p>
+          <p className="text-sm text-muted-foreground">若同步失敗，先確認授權是否仍有效，或檢查選到的日曆是否正確。</p>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 // ─── Settings Panel ───────────────────────────────────────────────────────────
 
 function SettingsPanel({
@@ -859,6 +904,7 @@ export default function CalendarPage() {
   });
   const [showModal, setShowModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showUsageHelp, setShowUsageHelp] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [importPayload, setImportPayload] = useState("");
@@ -1210,6 +1256,9 @@ export default function CalendarPage() {
         <Button size="sm" onClick={() => openNewEvent(currentDate)}>
           <Plus className="w-4 h-4" /> 新增
         </Button>
+        <Button size="sm" variant="outline" onClick={() => setShowUsageHelp(true)}>
+          <CircleHelp className="w-4 h-4" /> 使用說明
+        </Button>
         <Button size="icon" variant="ghost" onClick={load} disabled={isLoading}>
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
         </Button>
@@ -1284,6 +1333,10 @@ export default function CalendarPage() {
           onExport={exportData}
           onClose={() => setShowSettings(false)}
         />
+      )}
+
+      {showUsageHelp && (
+        <UsageHelpModal onClose={() => setShowUsageHelp(false)} />
       )}
     </div>
   );
