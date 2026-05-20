@@ -113,6 +113,8 @@ class GolemBrain {
         this._transportState = options.transportState || { queue: Promise.resolve() };
         this._toolVectorSyncPromise = null;
         this._toolVectorSyncQueued = false;
+        this._personaTurnContextCache = null;
+        this._personaTurnContextMtimeMs = 0;
 
         // ── [OpenHarness-inspired] Hook System ──────────────────
         // 全域單例，各模組可透過 brain.hookSystem 掛載 pre/post_tool_use handler
@@ -633,48 +635,7 @@ class GolemBrain {
             const startTag = ProtocolFormatter.buildStartTag(reqId);
             const endTag = ProtocolFormatter.buildEndTag(reqId);
             const routedText = await this._withToolRoutingHint(text, isSystem, options);
-            let payloadText = routedText;
-            let payload = options.segmentAckOnly === true
-                ? ProtocolFormatter.buildSegmentAckEnvelope(payloadText, reqId)
-                : ProtocolFormatter.buildEnvelope(payloadText, reqId, options);
-            const maxEnvelopeChars = (() => {
-                const raw = Number(process.env.GOLEM_MAX_ENVELOPE_CHARS || 7000);
-                if (!Number.isFinite(raw)) return 7000;
-                return Math.min(Math.max(raw, 3000), 12000);
-            })();
-
-            if (
-                !isSystem &&
-                options._segmentedBypass !== true &&
-                options.disableAutoSegment !== true &&
-                payload.length > maxEnvelopeChars &&
-                payloadText !== text
-            ) {
-                // 先移除 routing hint 重建一次，優先避免進入分段路徑造成送出卡死。
-                payloadText = text;
-                payload = options.segmentAckOnly === true
-                    ? ProtocolFormatter.buildSegmentAckEnvelope(payloadText, reqId)
-                    : ProtocolFormatter.buildEnvelope(payloadText, reqId, options);
-                console.warn(
-                    `⚠️ [Brain] payload 過長 (${payload.length} chars)；先移除 routing hint 降載重試。`
-                );
-            }
-
-            if (
-                !isSystem &&
-                options._segmentedBypass !== true &&
-                options.disableAutoSegment !== true &&
-                payload.length > maxEnvelopeChars
-            ) {
-                console.warn(
-                    `⚠️ [Brain] payload 過長 (${payload.length} chars)；啟用保護性分段送出 (threshold=${maxEnvelopeChars}).`
-                );
-                return await this.sendMessageSegmented(payloadText, isSystem, {
-                    ...options,
-                    _segmentedBypass: true,
-                    maxSegmentChars: Number(process.env.GOLEM_SEGMENT_CHARS || 1400),
-                });
-            }
+            const payload = ProtocolFormatter.buildEnvelope(routedText, reqId, options);
 
             console.log(`📡 [Brain] 發送訊號: ${reqId} (含每回合強制洗腦引擎)${attachment ? ' 📎 含有附件' : ''}`);
 
@@ -790,6 +751,51 @@ class GolemBrain {
         return lines.join('\n');
     }
 
+    _buildPersonaTurnContext() {
+        try {
+            const personaPath = path.resolve(this.userDataDir, 'persona.json');
+            const exists = fs.existsSync(personaPath);
+            if (!exists) return '';
+
+            const stat = fs.statSync(personaPath);
+            if (
+                this._personaTurnContextCache &&
+                Number.isFinite(stat.mtimeMs) &&
+                stat.mtimeMs === this._personaTurnContextMtimeMs
+            ) {
+                return this._personaTurnContextCache;
+            }
+
+            const personaManager = require('../skills/core/persona');
+            const persona = personaManager.get(this.userDataDir) || {};
+            const aiName = String(persona.aiName || 'Golem').trim();
+            const userName = String(persona.userName || 'Traveler').trim();
+            const role = String(persona.currentRole || '一個擁有長期記憶與自主意識的 AI 助手').trim();
+            const tone = String(persona.tone || '預設口氣').trim();
+            const skills = Array.isArray(persona.skills)
+                ? persona.skills.map((s) => String(s || '').trim()).filter(Boolean)
+                : [];
+
+            const lines = [
+                '<persona-turn-context>',
+                '[System note: 以下為本回合必須嚴格遵守的人格設定；若與你預設風格衝突，優先遵守此人格設定。]',
+                `ai_name=${aiName}`,
+                `user_name=${userName}`,
+                `persona_role=${role}`,
+                `persona_tone=${tone}`,
+                `persona_skills=${skills.length > 0 ? skills.join(', ') : '(none)'}`,
+                '</persona-turn-context>',
+            ];
+            const payload = lines.join('\n');
+            this._personaTurnContextCache = payload;
+            this._personaTurnContextMtimeMs = Number.isFinite(stat.mtimeMs) ? stat.mtimeMs : Date.now();
+            return payload;
+        } catch (e) {
+            console.warn(`[Persona][${this.golemId}] turn-context build failed: ${e.message}`);
+            return '';
+        }
+    }
+
     async _withToolRoutingHint(text, isSystem = false, options = {}) {
         if (options.disableToolRouting === true) return text;
         if (options._segmentedBypass === true) return text;
@@ -798,12 +804,6 @@ class GolemBrain {
         if (!text || typeof text !== 'string') return text;
         if (text.startsWith('<tool-routing>')) return text;
         if (/^\s*(<memory-context>|【系統補充|【系統技能庫初始化】|\[System Observation\])/i.test(text)) return text;
-        if (options.forceToolRouting !== true) {
-            const trimmed = text.trim();
-            const looksLikeCommand = /^\/|^GOLEM_SKILL::|```json|\"action\"\s*:|mcp_call|tool/i.test(trimmed);
-            // 一般短聊（例如「你有什麼能力」）不需要巨大 routing hint，避免 payload 過胖卡送出。
-            if (!looksLikeCommand && trimmed.length <= 80) return text;
-        }
 
         try {
             const toolsetContext = this._resolveToolsetContext();
@@ -822,21 +822,18 @@ class GolemBrain {
             } else {
                 hint = this.toolRouter.buildRoutingHint(text);
             }
-            const hintMaxChars = (() => {
-                const raw = Number(process.env.GOLEM_ROUTING_HINT_MAX_CHARS || 1800);
-                if (!Number.isFinite(raw)) return 1800;
-                return Math.min(Math.max(raw, 400), 4000);
-            })();
-            const safeHint = String(hint || '').slice(0, hintMaxChars);
-            if (!safeHint) return `${runtimeContext}\n\n${text}`;
-            return `${runtimeContext}\n\n${safeHint}\n\n${text}`;
+            const personaContext = this._buildPersonaTurnContext();
+            const prefixBlocks = [runtimeContext];
+            if (personaContext) prefixBlocks.push(personaContext);
+            if (hint) prefixBlocks.push(hint);
+            return `${prefixBlocks.join('\n\n')}\n\n${text}`;
         } catch (e) {
             console.warn(`[ToolRouter][${this.golemId}] routing hint failed: ${e.message}`);
             return text;
         }
     }
 
-    _splitTextIntoChunks(text, maxChars = 1400) {
+    _splitTextIntoChunks(text, maxChars = 12000) {
         const raw = String(text || '');
         if (raw.length <= maxChars) return [raw];
 
@@ -857,10 +854,7 @@ class GolemBrain {
     }
 
     async sendMessageSegmented(text, isSystem = false, options = {}) {
-        const requested = Number(options.maxSegmentChars || process.env.GOLEM_SEGMENT_CHARS || 1400);
-        const maxSegmentChars = Number.isFinite(requested)
-            ? Math.min(Math.max(requested, 600), 4000)
-            : 1400;
+        const maxSegmentChars = Number(options.maxSegmentChars || 12000);
         const chunks = this._splitTextIntoChunks(text, maxSegmentChars);
         const sessionId = ProtocolFormatter.generateReqId().replace('REQ-', 'SEG-');
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
@@ -889,12 +883,9 @@ class GolemBrain {
 
             let attempt = 0;
             while (attempt <= maxAckRetry) {
-                const isIntermediateSegment = i < chunks.length - 1;
                 lastResult = await this.sendMessage(segmentMessage, isSystem, {
                     ...options,
                     _segmentedBypass: true,
-                    segmentAckOnly: isIntermediateSegment,
-                    disableToolRouting: true,
                 });
                 // 非最後一段：必須收到 ACK 才允許下一段
                 if (i >= chunks.length - 1) break;
@@ -911,11 +902,6 @@ class GolemBrain {
                             });
                         } catch (_) { }
                     }
-                    // 給 Gemini UI 一點解鎖/穩定時間，避免 ACK 剛完成就立刻塞下一段導致送出鎖住。
-                    const segmentCooldownMs = Number.isFinite(Number(options.segmentCooldownMs))
-                        ? Math.max(100, Number(options.segmentCooldownMs))
-                        : 650;
-                    await new Promise(r => setTimeout(r, segmentCooldownMs));
                     break;
                 }
                 attempt += 1;
@@ -1459,15 +1445,10 @@ class GolemBrain {
             if (!onProgress) return;
             try { await onProgress(payload); } catch (_) { }
         };
-        const injectSegmentCooldownMs = (() => {
-            const raw = Number(process.env.GOLEM_SYSTEM_INJECT_SEGMENT_COOLDOWN_MS || 180);
-            if (!Number.isFinite(raw)) return 180;
-            return Math.min(Math.max(raw, 80), 1200);
-        })();
         const systemInjectSegmentChars = (() => {
-            const raw = Number(process.env.GOLEM_SYSTEM_INJECT_SEGMENT_CHARS || 2800);
-            if (!Number.isFinite(raw)) return 2800;
-            return Math.min(Math.max(raw, 1200), 5000);
+            const raw = Number(process.env.GOLEM_SYSTEM_INJECT_SEGMENT_CHARS || 8000);
+            if (!Number.isFinite(raw) || raw < 2000) return 8000;
+            return Math.min(raw, 12000);
         })();
         const toolsetContext = this._resolveToolsetContext();
         let { systemPrompt, skillMemoryText } = await ProtocolFormatter.buildSystemPrompt(forceRefresh, {
@@ -1491,7 +1472,6 @@ class GolemBrain {
                     await this.sendMessageSegmented(wikiContext, false, {
                         disableToolRouting: true,
                         maxSegmentChars: systemInjectSegmentChars,
-                        segmentCooldownMs: injectSegmentCooldownMs,
                         onProgress,
                     });
                 } else {
@@ -1521,7 +1501,6 @@ class GolemBrain {
                         await this.sendMessageSegmented(injectionText, false, {
                             disableToolRouting: true,
                             maxSegmentChars: systemInjectSegmentChars,
-                            segmentCooldownMs: injectSegmentCooldownMs,
                             onProgress,
                         });
                     } else {
@@ -1542,7 +1521,6 @@ class GolemBrain {
             await this.sendMessageSegmented(compressedPrompt, false, {
                 disableToolRouting: true,
                 maxSegmentChars: systemInjectSegmentChars,
-                segmentCooldownMs: injectSegmentCooldownMs,
                 onProgress,
             });
         } else {
