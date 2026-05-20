@@ -498,99 +498,126 @@ class GolemBrain {
         }
         if (!this.page) throw new Error("大腦尚未啟動。");
         try {
-            const result = await this.page.evaluate(async (mode) => {
+            const result = await this.page.evaluate(async (modeInput) => {
                 const delay = (ms) => new Promise(r => setTimeout(r, ms));
+                const aliasMap = {
+                    fast: 'flash-lite',
+                    lite: 'flash-lite',
+                    'flash-lite': 'flash-lite',
+                    flashlite: 'flash-lite',
+                    thinking: 'flash',
+                    think: 'flash',
+                    flash: 'flash',
+                    pro: 'pro',
+                };
+                const normalized = String(modeInput || '').trim().toLowerCase();
+                const canonicalMode = aliasMap[normalized] || normalized;
 
-                // 定義支援的模式及其可能的中英文關鍵字
-                const modeKeywords = {
-                    'fast': ['fast', '快捷'],
-                    'thinking': ['thinking', '思考型', '思考'], // 增加容錯率
-                    'pro': ['pro'] // Pro 通常中英文都叫 Pro
+                const targetMap = {
+                    'flash-lite': {
+                        include: ['flash-lite', 'flash lite', 'lite', '快捷', '快速', 'flash-lite 新模型'],
+                        exclude: [],
+                    },
+                    'flash': {
+                        include: ['3.5 flash', 'flash', 'thinking', '思考', '全方位協助', 'flash 新模型'],
+                        exclude: ['lite', 'flash-lite', 'flash lite'],
+                    },
+                    'pro': {
+                        include: ['pro', '專業', 'advanced'],
+                        exclude: [],
+                    },
+                };
+                const targetSpec = targetMap[canonicalMode];
+                if (!targetSpec) {
+                    return `⚠️ 不支援的模型模式: ${modeInput}。可用模式: flash-lite, flash, pro。`;
+                }
+
+                const isVisible = (el) => {
+                    if (!el) return false;
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+                };
+                const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+                const hasKeyword = (txt, keywords) => {
+                    const lower = norm(txt);
+                    return keywords.some((k) => lower.includes(String(k).toLowerCase()));
+                };
+                const matchesTarget = (txt, spec) => {
+                    const lower = norm(txt);
+                    const includeHit = spec.include.some((k) => lower.includes(String(k).toLowerCase()));
+                    const excludeHit = spec.exclude.some((k) => lower.includes(String(k).toLowerCase()));
+                    return includeHit && !excludeHit;
                 };
 
-                // 取得目標模式的所有關鍵字
-                const targetKeywords = modeKeywords[mode] || [mode];
-
-                // 1. 尋找畫面底部含有目標關鍵字的按鈕 (這可能是展開選單的按鈕)
-                const allKnownKeywords = [...modeKeywords.fast, ...modeKeywords.thinking, ...modeKeywords.pro];
-                const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
-                let pickerBtn = null;
-
-                for (const btn of buttons) {
-                    const txt = (btn.innerText || "").toLowerCase().trim();
-                    if (allKnownKeywords.some(k => txt.includes(k.toLowerCase())) && btn.offsetHeight > 10 && btn.offsetHeight < 60) {
-                        const rect = btn.getBoundingClientRect();
-                        // 根據截圖，該按鈕位於畫面下半部
-                        if (rect.top > window.innerHeight / 2) {
-                            pickerBtn = btn;
-                            break;
-                        }
-                    }
+                const controls = Array.from(document.querySelectorAll('button,[role="button"],[aria-haspopup="menu"],[aria-expanded]'))
+                    .filter(isVisible);
+                let pickerBtn = controls.find((el) => {
+                    const label = `${el.innerText || ''} ${el.getAttribute('aria-label') || ''} ${el.getAttribute('data-test-id') || ''}`;
+                    return /flash|thinking|pro|模型|model|思考/.test(label.toLowerCase());
+                });
+                if (!pickerBtn) {
+                    pickerBtn = controls.find((el) => {
+                        const rect = el.getBoundingClientRect();
+                        const label = `${el.innerText || ''} ${el.getAttribute('aria-label') || ''}`;
+                        return rect.top > window.innerHeight * 0.5 && hasKeyword(label, ['flash', '模型', 'model', '思考']);
+                    });
                 }
+                if (!pickerBtn) return '⚠️ 找不到模型切換按鈕。Gemini UI 可能又改版，請先手動展開模型選單一次後再試。';
 
-                if (!pickerBtn) return "⚠️ 找不到畫面底部的模型切換按鈕。UI 可能已變更，或您停留在登入畫面。";
-
-                // ✨ [核心防呆] 檢查按鈕是否為「灰色不可點擊」狀態
-                const isDisabled = pickerBtn.disabled ||
-                    pickerBtn.getAttribute('aria-disabled') === 'true' ||
-                    pickerBtn.classList.contains('disabled');
-
+                const isDisabled = pickerBtn.disabled || pickerBtn.getAttribute('aria-disabled') === 'true' || pickerBtn.classList.contains('disabled');
                 if (isDisabled) {
-                    return "⚠️ 模型切換按鈕目前呈現「灰色不可點擊」狀態！這通常是因為您尚未登入 Google 帳號，或該帳號目前沒有權限切換模型。";
+                    return '⚠️ 模型切換按鈕目前不可點擊，可能尚未登入或帳號權限不支援切換。';
                 }
 
-                // 點擊展開選單
                 pickerBtn.click();
-                await delay(1000); // 等待選單彈出動畫
+                await delay(650);
 
-                // 2. 尋找選單中對應的目標模式 (比對中英文關鍵字)
-                const items = Array.from(document.querySelectorAll('*'));
-                let targetElement = null;
-                let bestMatch = null;
+                const menuCandidates = Array.from(document.querySelectorAll('[role="menuitem"],[role="menuitemradio"],[role="option"],li,button,div'))
+                    .filter((el) => {
+                        if (!isVisible(el)) return false;
+                        if (pickerBtn === el || pickerBtn.contains(el)) return false;
+                        const txt = norm(el.innerText || el.getAttribute('aria-label') || '');
+                        if (!txt || txt.length > 120) return false;
+                        return true;
+                    });
 
-                for (const el of items) {
-                    // 排除觸發按鈕本身，避免點到自己導致選單關閉
-                    if (pickerBtn === el || pickerBtn.contains(el)) continue;
+                const scored = menuCandidates
+                    .map((el) => {
+                        const txt = norm(`${el.innerText || ''} ${el.getAttribute('aria-label') || ''}`);
+                        const ariaChecked = String(el.getAttribute('aria-checked') || '').toLowerCase() === 'true';
+                        let score = 0;
+                        if (matchesTarget(txt, targetSpec)) score += 12;
+                        if (canonicalMode === 'flash' && /\bflash\b/.test(txt) && !/lite/.test(txt)) score += 4;
+                        if (canonicalMode === 'flash-lite' && /flash[\s-]?lite|lite/.test(txt)) score += 4;
+                        if (canonicalMode === 'pro' && /\bpro\b/.test(txt)) score += 4;
+                        if (/\b(role=menuitem|role=menuitemradio|role=option)\b/i.test(`role=${el.getAttribute('role') || ''}`)) score += 4;
+                        if (txt.includes('新模型')) score += 1;
+                        if (ariaChecked) score -= 6; // 優先點擊「非目前已選」項目
+                        return { el, txt, score, ariaChecked };
+                    })
+                    .filter((x) => x.score > 0)
+                    .sort((a, b) => b.score - a.score);
 
-                    // 排除不可見的元素
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0) continue;
-
-                    const txt = (el.innerText || "").trim().toLowerCase();
-
-                    // 【防呆關鍵】如果文字太長，代表它是大容器 (例如整個網頁 background)，絕對不能點擊
-                    if (txt.length === 0 || txt.length > 50) continue;
-
-                    // 檢查是否包含目標關鍵字
-                    if (targetKeywords.some(keyword => txt.includes(keyword.toLowerCase()))) {
-                        // 優先尋找帶有標準選單屬性的元素
-                        const role = el.getAttribute('role');
-                        if (role === 'menuitem' || role === 'menuitemradio' || role === 'option') {
-                            targetElement = el;
-                            break; // 找到最標準的選項，直接選定中斷
-                        }
-
-                        // 否則，尋找最深層的元素 (querySelectorAll 由外而內，最後的通常最深)
-                        bestMatch = el;
-                    }
-                }
-
-                // 如果找不到標準 role，使用最深層的比對結果
-                if (!targetElement) {
-                    targetElement = bestMatch;
-                }
-
-                if (!targetElement) {
-                    // 若真的找不到，點擊背景關閉選單避免畫面卡死
+                const best = scored[0];
+                if (!best) {
                     document.body.click();
-                    return `⚠️ 選單已展開，但找不到對應「${mode}」的選項 (已搜尋關鍵字: ${targetKeywords.join(', ')})。您可能目前無法使用該模型。`;
+                    const sample = menuCandidates.slice(0, 8).map((el) => norm(el.innerText || el.getAttribute('aria-label') || '')).filter(Boolean);
+                    return `⚠️ 選單已開啟，但找不到 ${canonicalMode}。候選項: ${sample.join(' | ') || 'none'}`;
                 }
 
-                // 點擊目標選項
-                targetElement.click();
-                await delay(800);
-                return `✅ 成功為您點擊並切換至 [${mode}] 模式！`;
-            }, targetMode.toLowerCase());
+                best.el.click();
+                await delay(700);
+                const refreshControls = Array.from(document.querySelectorAll('button,[role="button"],[aria-haspopup="menu"],[aria-expanded]'))
+                    .filter(isVisible);
+                const activeLabel = refreshControls
+                    .map((el) => norm(`${el.innerText || ''} ${el.getAttribute('aria-label') || ''}`))
+                    .find((txt) => /flash|thinking|pro|模型|model|思考/.test(txt)) || '';
+                if (!matchesTarget(activeLabel, targetSpec)) {
+                    return `⚠️ 指令已執行，但畫面目前仍像是「${activeLabel || 'unknown'}」，未確認切到 ${canonicalMode}。請先手動展開模型選單確認。`;
+                }
+                return `✅ 已切換模型: ${canonicalMode}`;
+            }, targetMode);
 
             return result;
         } catch (error) {

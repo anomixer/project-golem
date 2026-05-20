@@ -14,10 +14,10 @@ module.exports = [
     { command: '/new_memory', description: '徹底轉生：物理清空底層資料庫 (DB) 並重置對話，完全忘記過去細節。' },
     {
         command: '/model', 
-        description: '模型切換：切換 Gemini 的大腦模型 (fast/thinking/pro)。',
+        description: '模型切換：切換 Gemini 的大腦模型 (flash-lite/flash/pro，兼容 fast/thinking)。',
         options: [
-            { name: 'fast', description: '回答速度快 (效能優先)' },
-            { name: 'thinking', description: '具備深度思考 (邏輯優先)' },
+            { name: 'flash-lite', description: '快速回應 (速度優先)' },
+            { name: 'flash', description: '平衡思考 (綜合優先)' },
             { name: 'pro', description: '進階程式碼與數學能力 (專業優先)' }
         ]
     },
