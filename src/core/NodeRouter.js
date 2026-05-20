@@ -295,6 +295,22 @@ class NodeRouter {
             return true;
         }
 
+        if (text === '/model' || text.startsWith('/model ')) {
+            if (!brain || typeof brain.switchModel !== 'function') {
+                return await reply('⚠️ 大腦尚未初始化，無法執行 /model。');
+            }
+            const rawArg = text.replace(/^\/model\s*/i, '').trim();
+            if (!rawArg) {
+                return await reply(
+                    '🧠 用法：`/model <模式>`\n' +
+                    '- 支援：`flash-lite` (`fast`), `flash` (`thinking`), `pro`\n' +
+                    '- 範例：`/model flash-lite`'
+                );
+            }
+            const result = await brain.switchModel(rawArg);
+            return await reply(String(result || '（無回傳）'));
+        }
+
         if (text === '/level' || text.startsWith('/level ')) {
             if (ctx.isAdmin !== true) {
                 return await reply('⛔ 權限不足：/level 僅限管理員使用。');

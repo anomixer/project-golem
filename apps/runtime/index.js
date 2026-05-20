@@ -729,32 +729,9 @@ async function handleUnifiedMessage(ctx, forceTargetId = null) {
         return;
     }
 
-    // ✨ [新增] /model 指令實作
+    // /model 交由 NodeRouter 單一來源處理，避免與 runtime 文案分叉
     if (ctx.isAdmin && ctx.text && ctx.text.trim().toLowerCase().startsWith('/model')) {
-        const args = ctx.text.trim().split(/\s+/);
-        const targetModel = args[1] ? args[1].toLowerCase() : '';
-
-        // 根據截圖防呆，只允許 fast, thinking, pro
-        if (!['fast', 'thinking', 'pro'].includes(targetModel)) {
-            await ctx.reply("ℹ️ 請輸入正確的模組關鍵字，例如：\n`/model fast` (回答速度快)\n`/model thinking` (具備深度思考)\n`/model pro` (進階程式碼與數學能力)");
-            return;
-        }
-
-        await ctx.reply(`🔄 啟動視覺神經，嘗試為您操作網頁切換至 [${targetModel}] 模式...`);
-        try {
-            if (typeof brain.switchModel === 'function') {
-                const result = await brain.switchModel(targetModel);
-                await ctx.reply(result);
-                await notifyBrainSystemChange(
-                    '模型模式已由管理員切換',
-                    `model_mode=${targetModel}`
-                );
-            } else {
-                await ctx.reply("⚠️ 您的 GolemBrain 尚未掛載 switchModel 功能，請確認檔案是否已更新。");
-            }
-        } catch (e) {
-            await ctx.reply(`❌ 切換模組失敗: ${e.message}`);
-        }
+        if (await NodeRouter.handle(ctx, brain)) return;
         return;
     }
 
@@ -778,24 +755,9 @@ async function handleUnifiedMessage(ctx, forceTargetId = null) {
         return;
     }
 
-    // ✨ [新增] /level 指令實作 (熱切換自主安全等級)
+    // /level 交由 NodeRouter 單一來源處理，避免 runtime 與指令中心不一致
     if (ctx.isAdmin && ctx.text && ctx.text.trim().toLowerCase().startsWith('/level')) {
-        const args = ctx.text.trim().split(/\s+/);
-        const targetLevel = parseInt(args[1], 10);
-        
-        if (isNaN(targetLevel) || targetLevel < 0 || targetLevel > 3) {
-            const lvlName = SecurityManager.LEVELS['L'+SecurityManager.currentLevel] ? SecurityManager.LEVELS['L'+SecurityManager.currentLevel].name : 'Unknown';
-            await ctx.reply(`ℹ️ 目前的安全指令風險等級為：**L${SecurityManager.currentLevel} (${lvlName})**\n\n請輸入 0-3 的數字切換等級，例如：\n\`/level 0\` (最安全，唯讀)\n\`/level 1\` (低風險)\n\`/level 2\` (中風險，預設)\n\`/level 3\` (最高權限)\n\n當指令風險超過目前設定時，將自動受到安全系統攔截。`, { parse_mode: 'Markdown' });
-            return;
-        }
-
-        SecurityManager.currentLevel = targetLevel;
-        const levelInfo = SecurityManager.LEVELS['L'+targetLevel];
-        await ctx.reply(`🛡️ **安全等級已動態切換**\n目前的自主控制權限已調整為：**L${targetLevel} (${levelInfo.name})**\n所有風險等級高於此設定的指令都將遭到自動攔截。`, { parse_mode: 'Markdown' });
-        await notifyBrainSystemChange(
-            '安全等級已由管理員切換',
-            `current_level=L${targetLevel}\nlevel_name=${levelInfo.name}`
-        );
+        if (await NodeRouter.handle(ctx, brain)) return;
         return;
     }
 
