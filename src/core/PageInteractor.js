@@ -118,7 +118,7 @@ class PageInteractor {
             if (finalResponse.status === 'TIMEOUT') {
                 const timedOutText = String(finalResponse.text || '').trim();
                 const hasStartedEnvelope = timedOutText.includes(startTag) || /\[\[?BEGIN\s*:/i.test(timedOutText);
-                if (!options.allowPartialOnTimeout || !hasStartedEnvelope) {
+                if (!hasStartedEnvelope && !options.allowPartialOnTimeout) {
                     throw new Error("等待回應超時");
                 }
                 finalResponse.status = 'ENVELOPE_TIMEOUT_PARTIAL';
@@ -740,11 +740,68 @@ class PageInteractor {
                 throw new Error("Gemini 草稿未送出：已植入文字，但送出按鈕沒有啟用或訊息沒有離開輸入框。");
             }
         }
+        let draftState = await this._inspectComposerDraftState(options.startTag || '').catch(() => ({ hasDraft: false, length: 0, hasStartTag: false }));
+        if (draftState.hasDraft) {
+            console.warn(`⚠️ [PageInteractor] 偵測到草稿仍在輸入框（len=${draftState.length}, startTag=${draftState.hasStartTag}），執行第三次送出補強。`);
+            const thirdTarget = await this._tryClickSendButton(sendSelector);
+            if (!thirdTarget || !thirdTarget.clicked) {
+                await this._pressSubmitKeys();
+            } else {
+                console.log(`🎯 [PageInteractor] 第三次送出候選按鈕 score=${thirdTarget.score || 0} label="${thirdTarget.label || ''}"`);
+                await this._performSendClick(thirdTarget);
+            }
+            await new Promise(r => setTimeout(r, 300));
+            draftState = await this._inspectComposerDraftState(options.startTag || '').catch(() => ({ hasDraft: false, length: 0, hasStartTag: false }));
+            if (draftState.hasDraft) {
+                throw new Error(`Gemini 草稿未送出：輸入框仍殘留內容（len=${draftState.length}, startTag=${draftState.hasStartTag}）。`);
+            }
+        }
 
         // 3. 自動置底 (最小化干擾)
         await this._moveWindowToBottom();
 
         await new Promise(r => setTimeout(r, 200));
+    }
+
+    async _inspectComposerDraftState(startTag = '') {
+        return this.page.evaluate(({ sTag }) => {
+            const editorSelector = [
+                '.ProseMirror',
+                '.ql-editor',
+                'rich-textarea .ProseMirror',
+                'rich-textarea .ql-editor',
+                'rich-textarea div[contenteditable="true"]',
+                'div[role="textbox"][contenteditable="true"]',
+                'div[contenteditable="true"]',
+                'textarea'
+            ].join(', ');
+            const visible = (el) => {
+                if (!el) return false;
+                const style = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const textOf = (el) => {
+                if (!el) return '';
+                if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return el.value || '';
+                return el.innerText || el.textContent || '';
+            };
+            const editors = Array.from(document.querySelectorAll(editorSelector)).filter(visible);
+            editors.sort((a, b) => {
+                const ar = a.getBoundingClientRect();
+                const br = b.getBoundingClientRect();
+                return (br.bottom - ar.bottom) || (br.left - ar.left);
+            });
+            const text = textOf(editors[0] || null).trim();
+            const hasStartTag = Boolean(sTag && text.includes(sTag));
+            const hasAnyBegin = /\[\[?BEGIN\s*:/i.test(text);
+            const hasDraft = hasStartTag || hasAnyBegin || text.length > 80;
+            return {
+                hasDraft,
+                hasStartTag,
+                length: text.length
+            };
+        }, { sTag: startTag || '' });
     }
 
     async _pressSubmitKeys() {
@@ -991,29 +1048,86 @@ class PageInteractor {
                     return label.includes('stop') || label.includes('停止') || label.includes('中斷') || label.includes('停止生成');
                 });
 
+                const isEditableNode = (el) => {
+                    if (!el) return false;
+                    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return true;
+                    if (el.isContentEditable) return true;
+                    if (el.getAttribute && el.getAttribute('contenteditable') === 'true') return true;
+                    return false;
+                };
+                const isResponseNode = (el) => {
+                    if (!el) return false;
+                    if (isEditableNode(el)) return false;
+                    return Boolean(
+                        el.closest('model-response') ||
+                        el.closest('.model-response-text') ||
+                        el.closest('.message-content') ||
+                        el.closest('[data-message-id]') ||
+                        el.closest('.conversation-turn')
+                    );
+                };
+
                 let responseChanged = false;
+                let responseFromNonEditable = false;
                 if (responseSelector) {
                     try {
                         const responses = Array.from(document.querySelectorAll(responseSelector));
-                        const latest = responses.length ? responses[responses.length - 1] : null;
+                        const semanticCandidates = responses.filter((node) => isResponseNode(node));
+                        const latest = (semanticCandidates.length ? semanticCandidates : responses).slice(-1)[0] || null;
                         const latestText = textOf(latest);
-                        responseChanged = Boolean(latestText && latestText !== baseline && (!startTag || latestText.includes(startTag) || latestText.length > String(baseline || '').length + 20));
+                        responseFromNonEditable = Boolean(latest && !isEditableNode(latest));
+                        responseChanged = Boolean(
+                            latestText &&
+                            latestText !== baseline &&
+                            responseFromNonEditable &&
+                            (!startTag || latestText.includes(startTag) || latestText.length > String(baseline || '').length + 20)
+                        );
                     } catch (_) { }
                 }
+
+                const composerLikelyCleared = composerTextLength === 0;
+                const responseSignal = responseChanged && responseFromNonEditable;
+                const matchedSignals =
+                    (hasStop ? 1 : 0) +
+                    (responseSignal ? 1 : 0) +
+                    (composerLikelyCleared ? 1 : 0);
 
                 return {
                     composerTextLength,
                     hasStop,
-                    responseChanged
+                    responseChanged,
+                    responseFromNonEditable,
+                    responseSignal,
+                    composerLikelyCleared,
+                    matchedSignals
                 };
             }, {
                 responseSelector: options.responseSelector || '',
                 baseline: options.baseline || '',
                 startTag: options.startTag || ''
-            }).catch(() => ({ composerTextLength: 1, hasStop: false, responseChanged: false }));
+            }).catch(() => ({
+                composerTextLength: 1,
+                hasStop: false,
+                responseChanged: false,
+                responseFromNonEditable: false,
+                responseSignal: false,
+                composerLikelyCleared: false,
+                matchedSignals: 0
+            }));
 
-            const safeState = state || { composerTextLength: 1, hasStop: false, responseChanged: false };
-            if (safeState.hasStop || safeState.responseChanged || safeState.composerTextLength === 0) {
+            const safeState = state || {
+                composerTextLength: 1,
+                hasStop: false,
+                responseChanged: false,
+                responseFromNonEditable: false,
+                responseSignal: false,
+                composerLikelyCleared: false,
+                matchedSignals: 0
+            };
+            if (safeState.hasStop) {
+                return true;
+            }
+            if (safeState.matchedSignals >= 2) {
                 return true;
             }
             await new Promise(r => setTimeout(r, 300));
