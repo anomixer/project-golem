@@ -32,26 +32,56 @@ class ResponseExtractor {
             async ({ sel, sTag, eTag, oldText, _stableComplete, _stableThinking, _pollInterval, _timeout }) => {
                 return new Promise((resolve) => {
                     const startTime = Date.now();
+                    let beganAt = 0;
                     let stableCount = 0;
                     let lastCheckText = "";
                     let lastResponseText = "";
                     let lastAttachments = [];
 
                     const check = () => {
-                        const bubbles = document.querySelectorAll(sel);
+                        const bubbles = Array.from(document.querySelectorAll(sel));
                         if (bubbles.length === 0) { setTimeout(check, _pollInterval); return; }
 
-                        let currentLastBubble = bubbles[bubbles.length - 1];
+                        const isEditableNode = (el) => {
+                            if (!el) return false;
+                            if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return true;
+                            if (el.isContentEditable) return true;
+                            if (el.getAttribute && el.getAttribute('contenteditable') === 'true') return true;
+                            return false;
+                        };
+                        const isSemanticResponseNode = (el) => {
+                            if (!el) return false;
+                            if (isEditableNode(el)) return false;
+                            return Boolean(
+                                el.closest('model-response') ||
+                                el.closest('.model-response-text') ||
+                                el.closest('.message-content') ||
+                                el.closest('[data-message-id]') ||
+                                el.closest('.conversation-turn')
+                            );
+                        };
+
+                        const semanticCandidates = bubbles.filter((node) => isSemanticResponseNode(node));
+                        let currentLastBubble = (semanticCandidates.length ? semanticCandidates : bubbles).slice(-1)[0] || null;
+                        if (!currentLastBubble) { setTimeout(check, _pollInterval); return; }
+
                         let container = currentLastBubble.closest('model-response') ||
                             currentLastBubble.closest('.markdown') ||
                             currentLastBubble.closest('.model-response-text') ||
+                            currentLastBubble.closest('.message-content') ||
                             currentLastBubble.parentElement ||
                             currentLastBubble;
+                        if (isEditableNode(container)) {
+                            container = currentLastBubble;
+                        }
 
                         const rawText = container.innerText || "";
                         lastResponseText = rawText;
                         const startIndex = rawText.indexOf(sTag);
                         const endIndex = rawText.indexOf(eTag);
+                        if (startIndex !== -1 && beganAt === 0) {
+                            beganAt = Date.now();
+                        }
 
                         // 📸 [v9.1.10] 提取容器內的圖片與其他附件
                         const attachments = [];
@@ -118,6 +148,16 @@ class ResponseExtractor {
                                 const content = rawText.substring(startIndex + sTag.length).trim();
                                 resolve({ 
                                     status: 'ENVELOPE_TRUNCATED', 
+                                    text: content,
+                                    attachments: attachments
+                                });
+                                return;
+                            }
+                            // [v9.6.22] BEGIN 後若遲遲沒 END，給絕對上限避免首則卡死
+                            if (beganAt > 0 && Date.now() - beganAt > 45000) {
+                                const content = rawText.substring(startIndex + sTag.length).trim();
+                                resolve({
+                                    status: 'ENVELOPE_TRUNCATED_TIMEOUT',
                                     text: content,
                                     attachments: attachments
                                 });

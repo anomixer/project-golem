@@ -332,18 +332,13 @@ class NodeRouter {
                 const EnvManager = require('../utils/EnvManager');
                 const env = EnvManager.readEnv();
                 const mode = inferAutomationModeFromEnv(env);
-                const currentLevel = String(env.AUTONOMY_LEVEL || '2');
                 return await reply(
                     `🛡️ /level 說明（目前模式：\`${mode}\`）\n` +
                     `- \`/level 0\` Lockdown：最保守（只允許最低風險）\n` +
                     `- \`/level 1\` Guided：保守確認\n` +
                     `- \`/level 2\` Balanced：平衡模式（推薦）\n` +
                     `- \`/level 3\` Autopilot：高自動化\n` +
-                    `- \`/level 4\` Silent：最高自動化 + 靜默\n` +
-                    `- AUTONOMY_LEVEL: \`${currentLevel}\`\n` +
-                    `- GOLEM_INTERVENTION_LEVEL: \`${env.GOLEM_INTERVENTION_LEVEL || 'NORMAL'}\`\n` +
-                    `- GOLEM_AUTO_APPROVE_ALL: \`${env.GOLEM_AUTO_APPROVE_ALL || 'false'}\`\n` +
-                    `- GOLEM_SILENT_AUTO_APPROVE: \`${env.GOLEM_SILENT_AUTO_APPROVE || 'false'}\``
+                    `- \`/level 4\` Silent：最高自動化 + 靜默`
                 );
             }
 
@@ -359,9 +354,7 @@ class NodeRouter {
                     `mode=${nextMode}\nAUTONOMY_LEVEL=${payload.AUTONOMY_LEVEL}\nGOLEM_INTERVENTION_LEVEL=${payload.GOLEM_INTERVENTION_LEVEL}`
                 );
                 return await reply(
-                    `✅ 已切換至 \`${nextMode}\` 模式（已同步 Dashboard 安全與指令設定）。\n` +
-                    `- AUTONOMY_LEVEL=${payload.AUTONOMY_LEVEL}\n` +
-                    `- GOLEM_INTERVENTION_LEVEL=${payload.GOLEM_INTERVENTION_LEVEL}`
+                    `✅ 已切換至 \`${nextMode}\` 模式（已同步 Dashboard 安全與指令設定）。`
                 );
             } catch (e) {
                 return await reply(`❌ 模式切換失敗: ${e.message}`);
