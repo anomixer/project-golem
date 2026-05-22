@@ -85,15 +85,15 @@ Many AI tools are great for one-shot prompts, but weak for continuous work. Proj
 
 ## UI showcase
 
-<img src="assets/1.jpg" width="900" alt="Dashboard Overview" />
-<img src="assets/2.jpg" width="900" alt="Dashboard Chat" />
-<img src="assets/3.jpg" width="900" alt="Dashboard Skills" />
-<img src="assets/4.jpg" width="900" alt="Dashboard Memory" />
-<img src="assets/5.jpg" width="900" alt="Dashboard Stocks" />
-<img src="assets/6.jpg" width="900" alt="Dashboard MCP" />
-<img src="assets/7.jpg" width="900" alt="Dashboard Calendar" />
-<img src="assets/8.jpg" width="900" alt="Dashboard RPG" />
-<img src="assets/9.jpg" width="900" alt="Dashboard Settings" />
+<img src="assets/dashboard-overview.png" width="900" alt="Dashboard Overview" />
+<img src="assets/dashboard-chat.png" width="900" alt="Dashboard Chat" />
+<img src="assets/dashboard-skills.png" width="900" alt="Dashboard Skills" />
+<img src="assets/dashboard-memory-core.png" width="900" alt="Dashboard Memory" />
+<img src="assets/dashboard-stocks.png" width="900" alt="Dashboard Stocks" />
+<img src="assets/dashboard-mcp.png" width="900" alt="Dashboard MCP" />
+<img src="assets/dashboard-calendar.png" width="900" alt="Dashboard Calendar" />
+<img src="assets/dashboard-rpg.png" width="900" alt="Dashboard RPG" />
+<img src="assets/dashboard-settings.png" width="900" alt="Dashboard Settings" />
 
 Current main dashboard routes (from `web-dashboard/src/app/dashboard`) include:
 
