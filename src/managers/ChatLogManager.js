@@ -5,6 +5,10 @@ const { LOG_RETENTION_MS, MEMORY_TIERS } = require('../core/constants');
 const ResponseParser = require('../utils/ResponseParser');
 const TrajectoryCompressor = require('./TrajectoryCompressor');
 
+const DAILY_COMPRESSION_LARGE_PAYLOAD_CHARS = 30000;
+const DAILY_COMPRESSION_RESPONSE_TIMEOUT_MS = 8 * 60 * 1000;
+const DAILY_COMPRESSION_CHUNK_TARGET_CHARS = 12000;
+
 let sqlite3Instance = null;
 
 function getSqlite3() {
@@ -353,8 +357,7 @@ class ChatLogManager {
         const totalChars = combinedContent.length;
         console.log(`🤖 [LogManager] 待壓縮對話計 ${messages.length} 條，總字數 ${totalChars}。請求 Gemini...`);
         
-        const prompt = `【系統指令：對話回顧與壓縮】\n以下是 ${dateString} 的對話記錄。請整理成約 ${MEMORY_TIERS.DAILY_SUMMARY_CHARS} 字的精煉摘要，保留重要決策、進度與細節：\n\n${combinedContent}`;
-        await this._compressAndSave(prompt, dateString, 'daily', brain, totalChars);
+        await this._compressDailyByChunks(dateString, combinedContent, brain, totalChars);
     }
 
     // ============================================================
@@ -439,24 +442,91 @@ class ChatLogManager {
         await this._compressAndSave(prompt, decadeString, 'era', brain, combinedContent.length);
     }
 
-    async _compressAndSave(prompt, dateString, tier, brain, originalSize = 0) {
+    _splitDailyContent(content, targetChars = DAILY_COMPRESSION_CHUNK_TARGET_CHARS) {
+        const text = String(content || '');
+        if (!text) return [];
+        if (text.length <= targetChars) return [text];
+
+        const chunks = [];
+        let cursor = 0;
+        while (cursor < text.length) {
+            let next = Math.min(cursor + targetChars, text.length);
+            if (next < text.length) {
+                const lastBreak = text.lastIndexOf('\n', next);
+                if (lastBreak > cursor + Math.floor(targetChars * 0.5)) {
+                    next = lastBreak + 1;
+                }
+            }
+            chunks.push(text.slice(cursor, next));
+            cursor = next;
+        }
+        return chunks.filter(Boolean);
+    }
+
+    async _compressDailyByChunks(dateString, combinedContent, brain, originalSize = 0) {
         const startTime = Date.now();
         try {
-            const rawResponse = await brain.sendMessage(prompt, false);
+            const chunks = this._splitDailyContent(combinedContent, DAILY_COMPRESSION_CHUNK_TARGET_CHARS);
+            console.log(`🧩 [LogManager] ${dateString} daily 分段摘要模式：${chunks.length} 段（原文 ${originalSize} chars）。`);
+            if (originalSize >= DAILY_COMPRESSION_LARGE_PAYLOAD_CHARS) {
+                console.log(`⏱️ [LogManager] ${dateString} daily 大 payload，分段與合併步驟均使用 ${Math.round(DAILY_COMPRESSION_RESPONSE_TIMEOUT_MS / 1000)}s 等待上限。`);
+            }
+
+            const chunkSummaries = [];
+            for (let index = 0; index < chunks.length; index += 1) {
+                const chunk = chunks[index];
+                const chunkPrompt = `【系統指令：Daily 分段摘要 (${index + 1}/${chunks.length})】\n以下是 ${dateString} 對話片段，請先產出精煉摘要，聚焦重要決策、進度、阻塞、待辦與風險（約 350-600 字）：\n\n${chunk}`;
+                const rawResponse = await brain.sendMessage(chunkPrompt, false, {
+                    responseTimeoutMs: DAILY_COMPRESSION_RESPONSE_TIMEOUT_MS
+                });
+                const parsed = ResponseParser.parse(rawResponse);
+                const summaryText = String(parsed.reply || '').trim();
+                if (!summaryText) {
+                    throw new Error(`daily chunk ${index + 1}/${chunks.length} 摘要為空`);
+                }
+                chunkSummaries.push(`--- Chunk ${index + 1}/${chunks.length} ---\n${summaryText}`);
+            }
+
+            const mergePrompt = `【系統指令：Daily 摘要最終合併】\n以下是 ${dateString} 各分段摘要，請合併成一份約 ${MEMORY_TIERS.DAILY_SUMMARY_CHARS} 字的精煉 daily 摘要，保留關鍵決策、進度、細節、風險與下一步：\n\n${chunkSummaries.join('\n\n')}`;
+            const mergedResponse = await brain.sendMessage(mergePrompt, false, {
+                responseTimeoutMs: DAILY_COMPRESSION_RESPONSE_TIMEOUT_MS
+            });
+            const mergedParsed = ResponseParser.parse(mergedResponse);
+            const finalSummary = String(mergedParsed.reply || '').trim();
+            if (!finalSummary) {
+                throw new Error('daily 分段合併摘要為空');
+            }
+
+            await this._insertSummary('daily', dateString, finalSummary, originalSize);
+            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`✅ [LogManager] ${dateString} daily 產出成功！(耗時: ${duration}s, 摘要: ${finalSummary.length}字, 分段: ${chunks.length})`);
+        } catch (e) {
+            console.error(`❌ [LogManager] daily 分段生成失敗 (${dateString}):`, e.message);
+        }
+    }
+
+    async _insertSummary(tier, dateString, summaryText, originalSize = 0) {
+        await this.runAsync(
+            `INSERT INTO summaries (tier, date_string, timestamp, content, original_size, summary_size) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [tier, dateString, Date.now(), summaryText, originalSize, summaryText.length]
+        );
+    }
+
+    async _compressAndSave(prompt, dateString, tier, brain, originalSize = 0, sendOptions = {}) {
+        const startTime = Date.now();
+        try {
+            if (tier === 'daily' && Number.isFinite(sendOptions.responseTimeoutMs)) {
+                console.log(`⏱️ [LogManager] ${dateString} ${tier} 大 payload (${originalSize} chars)，暫時提升等待上限至 ${Math.round(sendOptions.responseTimeoutMs / 1000)}s。`);
+            }
+            const rawResponse = await brain.sendMessage(prompt, false, sendOptions);
             const duration = ((Date.now() - startTime) / 1000).toFixed(1);
             const parsed = ResponseParser.parse(rawResponse);
             const summaryText = parsed.reply || "";
 
             if (!summaryText || summaryText.trim().length === 0) return;
 
-            // Optional: for daily, we could delete the raw messages afterwards. 
-            // the legacy json logic did it. We'll rely on cleanup() to delete old messages.
-
-            await this.runAsync(
-                `INSERT INTO summaries (tier, date_string, timestamp, content, original_size, summary_size) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [tier, dateString, Date.now(), summaryText, originalSize, summaryText.length]
-            );
+            await this._insertSummary(tier, dateString, summaryText, originalSize);
 
             console.log(`✅ [LogManager] ${dateString} ${tier} 產出成功！(耗時: ${duration}s, 摘要: ${summaryText.length}字)`);
         } catch (e) {
