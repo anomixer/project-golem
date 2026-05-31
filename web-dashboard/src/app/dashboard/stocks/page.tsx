@@ -67,6 +67,19 @@ type StockQuote = {
     volume: number;
     turnover: number;
     marketCap: number | null;
+    trailingPE?: number | null;
+    forwardPE?: number | null;
+    priceToBook?: number | null;
+    beta?: number | null;
+    dividendYield?: number | null;
+    dividendRate?: number | null;
+    payoutRatio?: number | null;
+    epsTrailingTwelveMonths?: number | null;
+    epsForward?: number | null;
+    recommendationKey?: string | null;
+    targetMeanPrice?: number | null;
+    numberOfAnalystOpinions?: number | null;
+    sharesOutstanding?: number | null;
     sector: string;
     dataSource: string;
     lastUpdatedAt: string;
@@ -164,6 +177,25 @@ type NewsResponse = {
 type SnapshotRefreshResponse = {
     snapshot?: StockDashboardSnapshot;
 };
+type MostActiveItem = {
+    symbol: string;
+    yahooSymbol: string;
+    name: string;
+    volume: number;
+    price: number | null;
+    change: number | null;
+    changePercent: number | null;
+    previousClose: number | null;
+    market: "tw" | "us";
+    currency: string;
+    source: string;
+};
+type MostActiveResponse = {
+    success?: boolean;
+    market?: "tw" | "us";
+    items?: MostActiveItem[];
+    generatedAt?: string;
+};
 
 type StockDashboardSnapshot = {
     source: string;
@@ -190,6 +222,8 @@ type StockDashboardSnapshot = {
         previousSavedAt: string | null;
     };
 };
+type StockAnalysisMethodKey = "balanced" | "trend_following" | "mean_reversion" | "risk_control";
+type AnalysisScope = "selected" | "watchlist";
 
 const WATCHLIST_STORAGE_KEY = "golem-stock-watchlist-v1";
 const SUPPORT_PROMPT_STORAGE_KEY = "golem-stock-support-prompt-snoozed-at-v1";
@@ -267,6 +301,12 @@ const SUPPORT_COPY_VARIANTS = [
 ];
 const TAIWAN_SYMBOL_RE = /^\d{4,6}[A-Z]{0,3}$/;
 const TAIWAN_YAHOO_SYMBOL_RE = /^\d{4,6}[A-Z]{0,3}\.(TW|TWO)$/;
+const SYMBOL_ALIASES: Record<string, string> = {
+    TPEX: "^TWOII",
+    OTC: "^TWOII",
+    TAIEX: "^TWII",
+    TWSE: "^TWII",
+};
 const RANGE_MAP: Record<RangeKey, { range: string; interval: string }> = {
     "1D": { range: "1d", interval: "5m" },
     "1M": { range: "1mo", interval: "1d" },
@@ -274,10 +314,57 @@ const RANGE_MAP: Record<RangeKey, { range: string; interval: string }> = {
     "6M": { range: "6mo", interval: "1d" },
     "1Y": { range: "1y", interval: "1d" },
 };
+const STOCK_ANALYSIS_METHODS: Array<{
+    key: StockAnalysisMethodKey;
+    labelZh: string;
+    labelEn: string;
+    explainZh: string;
+    explainEn: string;
+    promptZh: string;
+    promptEn: string;
+}> = [
+    {
+        key: "balanced",
+        labelZh: "平衡評估",
+        labelEn: "Balanced",
+        explainZh: "綜合趨勢、動能、量能與新聞，給出保守且可執行的建議。",
+        explainEn: "Combines trend, momentum, volume, and news for a conservative actionable plan.",
+        promptZh: "請做平衡型分析：先判斷趨勢，再看動能與量能，最後給出三種情境（偏多/中性/偏空）與對應行動。",
+        promptEn: "Run a balanced analysis: trend first, then momentum/volume, then provide bullish/neutral/bearish scenarios with actions.",
+    },
+    {
+        key: "trend_following",
+        labelZh: "趨勢追蹤",
+        labelEn: "Trend Following",
+        explainZh: "以趨勢延續為主，重視均線結構、突破與回踩。",
+        explainEn: "Focuses on continuation setups, MA structure, breakouts, and pullbacks.",
+        promptZh: "請以趨勢追蹤角度分析：確認多空方向、關鍵突破位/失效位，給出順勢入場與出場條件。",
+        promptEn: "Analyze with trend-following logic: direction, breakout/invalidation levels, and trend-continuation entry/exit criteria.",
+    },
+    {
+        key: "mean_reversion",
+        labelZh: "均值回歸",
+        labelEn: "Mean Reversion",
+        explainZh: "以超漲超跌回歸為主，重視 RSI、偏離均線與波動收斂。",
+        explainEn: "Targets overextension pullbacks using RSI, MA deviation, and volatility compression.",
+        promptZh: "請以均值回歸角度分析：判斷是否超漲/超跌，提出分批進出與失效條件。",
+        promptEn: "Analyze for mean reversion: detect overbought/oversold states, then propose scaled entries/exits and invalidation.",
+    },
+    {
+        key: "risk_control",
+        labelZh: "風險控管",
+        labelEn: "Risk Control",
+        explainZh: "以資金保全優先，重點是倉位、停損與風險報酬比。",
+        explainEn: "Capital preservation first, emphasizing sizing, stop-loss, and risk/reward.",
+        promptZh: "請以風險控管為主：給出建議倉位%、停損區間、停利區間，並說明不進場的條件。",
+        promptEn: "Prioritize risk control: propose position size %, stop/target zones, and clear no-trade conditions.",
+    },
+];
 
 function normalizeSymbol(input: string) {
     const value = String(input || "").trim().toUpperCase().replace(/\s+/g, "");
     if (!value) return "";
+    if (SYMBOL_ALIASES[value]) return SYMBOL_ALIASES[value];
     if (TAIWAN_SYMBOL_RE.test(value)) return `${value}.TW`;
     if (TAIWAN_YAHOO_SYMBOL_RE.test(value)) return value;
     return value;
@@ -370,6 +457,16 @@ function getFreshnessLabel(value: string, localeCode: string) {
         hour: "2-digit",
         minute: "2-digit",
     }).format(new Date(parsed));
+}
+
+function getStockMethodLabel(method: StockAnalysisMethodKey, isEnglish: boolean) {
+    const found = STOCK_ANALYSIS_METHODS.find((item) => item.key === method) || STOCK_ANALYSIS_METHODS[0];
+    return isEnglish ? found.labelEn : found.labelZh;
+}
+
+function buildStockPromptTemplate(method: StockAnalysisMethodKey, isEnglish: boolean) {
+    const found = STOCK_ANALYSIS_METHODS.find((item) => item.key === method) || STOCK_ANALYSIS_METHODS[0];
+    return isEnglish ? found.promptEn : found.promptZh;
 }
 
 function calculateSmaAt(points: Array<{ close: number }>, index: number, period: number) {
@@ -532,11 +629,19 @@ export default function StockAnalysisPage() {
     const [isLoadingNews, setIsLoadingNews] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [isLoadingMostActive, setIsLoadingMostActive] = useState(false);
     const [sentSnapshot, setSentSnapshot] = useState(false);
+    const [analysisMethod, setAnalysisMethod] = useState<StockAnalysisMethodKey>("balanced");
+    const [analysisScope, setAnalysisScope] = useState<AnalysisScope>("selected");
+    const [analysisPrompt, setAnalysisPrompt] = useState("");
     const [lastUpdatedAt, setLastUpdatedAt] = useState("");
     const [isMounted, setIsMounted] = useState(false);
     const [showSupportPrompt, setShowSupportPrompt] = useState(false);
     const [supportCopyIndex, setSupportCopyIndex] = useState(0);
+    const [mostActiveItems, setMostActiveItems] = useState<MostActiveItem[]>([]);
+    const [showAllMostActive, setShowAllMostActive] = useState(false);
+    const [mostActiveMarket, setMostActiveMarket] = useState<"tw" | "us">("tw");
+    const [mostActiveActions, setMostActiveActions] = useState<Record<string, "add" | "chart" | "ask" | "news">>({});
     const [isFeatureEnabled, setIsFeatureEnabled] = useState(true);
     const [isSidebarHidden, setIsSidebarHidden] = useState(false);
     const lastInteractionRefreshRef = useRef(0);
@@ -633,12 +738,26 @@ export default function StockAnalysisPage() {
         }
     }, [isEnglish, toast]);
 
+    const loadMostActive = useCallback(async () => {
+        setIsLoadingMostActive(true);
+        try {
+            const data = await apiGet<MostActiveResponse>(apiUrl(`/api/stocks/most-active?market=${mostActiveMarket}&limit=50`));
+            setMostActiveItems(Array.isArray(data.items) ? data.items : []);
+        } catch (error) {
+            console.warn("[Stocks] Failed to load most active list:", error);
+            setMostActiveItems([]);
+        } finally {
+            setIsLoadingMostActive(false);
+        }
+    }, [mostActiveMarket]);
+
     const refreshDashboard = useCallback(async () => {
         await Promise.all([
             loadQuotes(),
             loadHistory(selectedSymbol, range),
+            loadMostActive(),
         ]);
-    }, [loadHistory, loadQuotes, range, selectedSymbol]);
+    }, [loadHistory, loadMostActive, loadQuotes, range, selectedSymbol]);
 
     const loadNews = useCallback(async (quote: StockQuote | null) => {
         if (!quote?.yahooSymbol) {
@@ -665,6 +784,57 @@ export default function StockAnalysisPage() {
         if (!isRuntimeActive) return;
         loadQuotes();
     }, [isRuntimeActive, loadQuotes]);
+
+    useEffect(() => {
+        if (!isRuntimeActive) return;
+        loadMostActive();
+    }, [isRuntimeActive, loadMostActive]);
+
+    const handleMostActiveAction = async (item: MostActiveItem) => {
+        const action = mostActiveActions[item.yahooSymbol] || "add";
+        if (action === "add") {
+            addSymbol(item.yahooSymbol);
+            return;
+        }
+        if (action === "chart") {
+            setSelectedSymbol(item.yahooSymbol);
+            if (!watchlist.includes(item.yahooSymbol)) {
+                await loadHistory(item.yahooSymbol, range);
+                await loadNews({
+                    symbol: item.symbol,
+                    yahooSymbol: item.yahooSymbol,
+                    name: item.name,
+                    market: item.market,
+                    currency: item.currency || "TWD",
+                    exchangeName: "",
+                    exchangeTimezoneName: "Asia/Taipei",
+                    price: Number(item.price || 0),
+                    previousClose: Number(item.previousClose || 0),
+                    open: null,
+                    dayHigh: null,
+                    dayLow: null,
+                    fiftyTwoWeekHigh: null,
+                    fiftyTwoWeekLow: null,
+                    change: Number(item.change || 0),
+                    changePercent: Number(item.changePercent || 0),
+                    volume: Number(item.volume || 0),
+                    turnover: Number(item.volume || 0) * Number(item.price || 0),
+                    marketCap: null,
+                    sector: item.market === "us" ? "US Equity" : "台股",
+                    dataSource: item.source || "Most Active",
+                    lastUpdatedAt: new Date().toISOString(),
+                });
+            }
+            return;
+        }
+        if (action === "news") {
+            addSymbol(item.yahooSymbol);
+            const quote = quotes.find((q) => q.yahooSymbol === item.yahooSymbol) || null;
+            if (quote) await loadNews(quote);
+            return;
+        }
+        await handleAskGolem(item.yahooSymbol);
+    };
 
     useEffect(() => {
         if (!isRuntimeActive) return;
@@ -773,6 +943,15 @@ export default function StockAnalysisPage() {
         generatedAt: new Date().toISOString(),
     }), [indicators, marketBreadth, news, quoteErrors, range, selectedMarket, selectedQuote, visibleQuotes]);
 
+    const selectedAnalysisMethod = useMemo(
+        () => STOCK_ANALYSIS_METHODS.find((item) => item.key === analysisMethod) || STOCK_ANALYSIS_METHODS[0],
+        [analysisMethod]
+    );
+
+    useEffect(() => {
+        setAnalysisPrompt(buildStockPromptTemplate(analysisMethod, isEnglish));
+    }, [analysisMethod, isEnglish]);
+
     useEffect(() => {
         if (!isRuntimeActive) return;
         if (!selectedQuote || !quotes.length) return;
@@ -804,7 +983,7 @@ export default function StockAnalysisPage() {
         });
     };
 
-    const handleAskGolem = async () => {
+    const handleAskGolem = async (targetSymbol?: string) => {
         if (!activeGolem) {
             toast.warning(
                 isEnglish ? "No active Golem" : "沒有可用的 Golem",
@@ -815,13 +994,28 @@ export default function StockAnalysisPage() {
         setIsSending(true);
         setSentSnapshot(false);
         try {
-            await refreshDashboard();
+            const selectedForRequest = targetSymbol ? normalizeSymbol(targetSymbol) : selectedSymbol;
+            if (targetSymbol) {
+                setSelectedSymbol(selectedForRequest);
+                await Promise.all([
+                    loadQuotes(),
+                    loadHistory(selectedForRequest, range),
+                    loadMostActive(),
+                ]);
+            } else {
+                await refreshDashboard();
+            }
+            const analysisSymbols = targetSymbol
+                ? [selectedForRequest]
+                : analysisScope === "selected"
+                ? [selectedSymbol]
+                : watchlist;
             let snapshotForGolem = snapshot;
             try {
                 const refreshed = await apiPost<SnapshotRefreshResponse>(apiUrl("/api/stocks/snapshot/refresh"), {
                     snapshot,
-                    symbols: watchlist,
-                    selectedSymbol,
+                    symbols: analysisSymbols,
+                    selectedSymbol: selectedForRequest,
                     selectedRange: range,
                     marketFilter: selectedMarket,
                     trigger: "dashboard-before-golem-analysis",
@@ -837,12 +1031,24 @@ export default function StockAnalysisPage() {
                     isEnglish ? `Live refresh failed: ${message}` : `即時刷新失敗：${message}`
                 );
             }
-            const symbolsForPrompt = Array.from(new Set([selectedSymbol, ...watchlist].map(normalizeSymbol).filter(Boolean)));
+            const symbolsForPrompt = Array.from(new Set(analysisSymbols.map(normalizeSymbol).filter(Boolean)));
+            const userPrompt = String(analysisPrompt || "").trim() || buildStockPromptTemplate(analysisMethod, isEnglish);
             const message = [
                 `/stockboard ${symbolsForPrompt.join(" ")}`,
                 isEnglish
-                    ? "Analyze the current Dashboard stock snapshot. The dashboard has just synchronized the latest server-side structured snapshot; use that complete snapshot as the primary source, mention freshness, and avoid guaranteed financial advice."
-                    : "請分析目前 Dashboard 股市看板。Dashboard 已先同步最新的 server-side 結構化快照；請以完整快照為主要資料來源，說明資料新鮮度，且不要做保證式投資建議。",
+                    ? `Analysis method: ${getStockMethodLabel(analysisMethod, true)}`
+                    : `分析方法：${getStockMethodLabel(analysisMethod, false)}`,
+                isEnglish
+                    ? `Analysis scope: ${analysisScope === "selected" ? "selected symbol only" : "entire watchlist"}`
+                    : `分析範圍：${analysisScope === "selected" ? "僅目前標的" : "全部自選"}`,
+                targetSymbol
+                    ? (isEnglish ? "Forced scope: single symbol action from Top Volume list." : "強制範圍：由成交量榜單觸發之單一標的分析。")
+                    : "",
+                isEnglish ? "User strategy prompt:" : "使用者策略提示：",
+                userPrompt,
+                isEnglish
+                    ? "Use the latest Dashboard structured snapshot as primary evidence. Explicitly mention data freshness and uncertainty; avoid guaranteed financial advice."
+                    : "請以最新 Dashboard 結構化快照為主要依據，明確標示資料新鮮度與不確定性，避免保證式投資建議。",
                 snapshotForGolem?.generatedAt
                     ? `${isEnglish ? "Snapshot generated at" : "快照產生時間"}: ${snapshotForGolem.generatedAt}`
                     : "",
@@ -851,7 +1057,9 @@ export default function StockAnalysisPage() {
             setSentSnapshot(true);
             toast.success(
                 isEnglish ? "Snapshot sent" : "已送出看板快照",
-                isEnglish ? "Golem is analyzing the live board in the console." : "Golem 會在控制台裡分析這份即時看板。"
+                isEnglish
+                    ? (targetSymbol ? "Single-symbol analysis sent. Open Chat to view the result." : "Please open Chat to view the analysis result.")
+                    : (targetSymbol ? "已送出單一標的分析，請到交談功能查看結果。" : "請直接到交談功能查看分析結果。")
             );
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -976,7 +1184,7 @@ export default function StockAnalysisPage() {
                             <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                             <div className="space-y-1 text-xs leading-5 text-muted-foreground">
                                 <div className="font-semibold text-foreground">{isEnglish ? "How to use" : "使用說明"}</div>
-                                <p>{isEnglish ? "Search a symbol, select a watchlist row, then ask Golem. Quotes refresh every minute while this page is open." : "搜尋股票、點選自選股列，再請 Golem 分析。頁面停留時每分鐘自動刷新行情。"}</p>
+                                <p>{isEnglish ? "Search a symbol, choose an analysis method, edit prompt if needed, then ask Golem. Quotes refresh every minute while this page is open." : "搜尋股票、選擇分析方法、必要時調整 prompt，再請 Golem 分析。頁面停留時每分鐘自動刷新行情。"}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -1047,7 +1255,7 @@ export default function StockAnalysisPage() {
                                 </div>
                             )}
 
-                            <div className="max-h-[320px] min-h-[146px] overflow-y-auto rounded-lg border border-border bg-secondary/25">
+                            <div className="max-h-[260px] min-h-[120px] overflow-y-auto rounded-lg border border-border bg-secondary/25">
                                 {isSearching ? (
                                     <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1075,6 +1283,33 @@ export default function StockAnalysisPage() {
                                         {isEnglish ? "Search by symbol or company name. Taiwan numeric symbols automatically use .TW." : "可搜尋代號或公司名稱。台股數字代號會自動轉成 .TW。"}
                                     </div>
                                 )}
+                            </div>
+                            <div className="space-y-2">
+                                <div className="text-xs text-muted-foreground">
+                                    {isEnglish ? "Quick switch watchlist" : "快速切換自選"}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {visibleQuotes.slice(0, 6).map((quote) => (
+                                        <button
+                                            key={`quick-${quote.yahooSymbol}`}
+                                            type="button"
+                                            onClick={() => setSelectedSymbol(quote.yahooSymbol)}
+                                            className={cn(
+                                                "rounded-md border px-2.5 py-1 text-xs transition-colors",
+                                                selectedSymbol === quote.yahooSymbol
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                                            )}
+                                        >
+                                            {quote.symbol}
+                                        </button>
+                                    ))}
+                                    {!visibleQuotes.length && (
+                                        <span className="text-xs text-muted-foreground">
+                                            {isEnglish ? "No watchlist symbols yet." : "尚未有自選標的。"}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -1105,30 +1340,149 @@ export default function StockAnalysisPage() {
                                         ? `${selectedQuote.dataSource}${selectedQuote.dataQuality === "stale-cache" ? (isEnglish ? " · stale cache" : " · 快取資料") : ""} · ${getFreshnessLabel(selectedQuote.lastUpdatedAt, localeCode)}`
                                         : isEnglish ? "No quote selected." : "尚未選取行情。"}
                                 </p>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                                        <div className="text-muted-foreground">{isEnglish ? "Market Cap" : "市值"}</div>
+                                        <div className="mt-0.5 font-semibold">{formatCompact(selectedQuote?.marketCap, localeCode)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                                        <div className="text-muted-foreground">{isEnglish ? "Trailing PE" : "本益比(TTM)"}</div>
+                                        <div className="mt-0.5 font-semibold">{formatNumber(selectedQuote?.trailingPE, localeCode, 2)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                                        <div className="text-muted-foreground">{isEnglish ? "Forward PE" : "預估本益比"}</div>
+                                        <div className="mt-0.5 font-semibold">{formatNumber(selectedQuote?.forwardPE, localeCode, 2)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                                        <div className="text-muted-foreground">{isEnglish ? "Dividend Yield" : "股息殖利率"}</div>
+                                        <div className="mt-0.5 font-semibold">
+                                            {selectedQuote?.dividendYield == null ? "--" : `${formatNumber(selectedQuote.dividendYield * 100, localeCode, 2)}%`}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-border/70 bg-secondary/30 p-2.5">
+                                    <div className="mb-2 text-xs text-muted-foreground">{isEnglish ? "Market Breadth" : "市場廣度"}</div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5">
+                                            <div className="text-[11px] text-muted-foreground">{isEnglish ? "Up" : "上漲"}</div>
+                                            <div className="text-base font-semibold text-emerald-600 dark:text-emerald-400">{marketBreadth.advancers}</div>
+                                        </div>
+                                        <div className="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1.5">
+                                            <div className="text-[11px] text-muted-foreground">{isEnglish ? "Down" : "下跌"}</div>
+                                            <div className="text-base font-semibold text-rose-600 dark:text-rose-400">{marketBreadth.decliners}</div>
+                                        </div>
+                                        <div className="rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-1.5">
+                                            <div className="text-[11px] text-muted-foreground">{isEnglish ? "Avg" : "平均"}</div>
+                                            <div className={cn("text-base font-semibold", getQuoteTone(marketBreadth.averageMove))}>
+                                                {marketBreadth.averageMove >= 0 ? "+" : ""}
+                                                {formatNumber(marketBreadth.averageMove, localeCode)}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
 
                         <Card className="rounded-lg border-border/80">
                             <CardHeader className="pb-3">
-                                <CardDescription>{isEnglish ? "Market Breadth" : "市場廣度"}</CardDescription>
-                                <CardTitle className="text-xl">{isEnglish ? "Watchlist Pulse" : "自選股脈動"}</CardTitle>
+                                <CardDescription>{isEnglish ? "Previous Session Leaderboard" : "前一交易日排行榜"}</CardDescription>
+                                <CardTitle className="text-xl">{isEnglish ? "Top 50 by Volume" : "成交量 Top 50"}</CardTitle>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-3 gap-3">
-                                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
-                                    <div className="text-xs text-muted-foreground">{isEnglish ? "Up" : "上漲"}</div>
-                                    <div className="mt-1 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{marketBreadth.advancers}</div>
+                            <CardContent className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={mostActiveMarket === "tw" ? "default" : "outline"}
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => setMostActiveMarket("tw")}
+                                    >
+                                        {isEnglish ? "Taiwan" : "台股"}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={mostActiveMarket === "us" ? "default" : "outline"}
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => setMostActiveMarket("us")}
+                                    >
+                                        {isEnglish ? "US" : "美股"}
+                                    </Button>
                                 </div>
-                                <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-3">
-                                    <div className="text-xs text-muted-foreground">{isEnglish ? "Down" : "下跌"}</div>
-                                    <div className="mt-1 text-2xl font-semibold text-rose-600 dark:text-rose-400">{marketBreadth.decliners}</div>
-                                </div>
-                                <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 p-3">
-                                    <div className="text-xs text-muted-foreground">{isEnglish ? "Avg" : "平均"}</div>
-                                    <div className={cn("mt-1 text-2xl font-semibold", getQuoteTone(marketBreadth.averageMove))}>
-                                        {marketBreadth.averageMove >= 0 ? "+" : ""}
-                                        {formatNumber(marketBreadth.averageMove, localeCode)}%
+                                {isLoadingMostActive ? (
+                                    <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        {isEnglish ? "Loading active symbols..." : "讀取熱門成交標的中..."}
                                     </div>
-                                </div>
+                                ) : mostActiveItems.length ? (
+                                    <div className="max-h-[310px] overflow-y-auto rounded-lg border border-border bg-background/40">
+                                        <div className="divide-y divide-border/70">
+                                            {mostActiveItems.slice(0, showAllMostActive ? 50 : 20).map((item) => (
+                                                <div key={`active-${item.yahooSymbol}`} className="space-y-2 px-3 py-2.5">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <div className="truncate text-sm font-semibold">{item.symbol} · {item.name}</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {isEnglish ? "Volume" : "成交量"} {formatCompact(item.volume, localeCode)}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm font-semibold">
+                                                                {item.currency} {formatNumber(item.price, localeCode)}
+                                                            </div>
+                                                            <div className={cn("text-xs font-semibold", getQuoteTone(item.change))}>
+                                                                {item.change !== null && item.change >= 0 ? "+" : ""}
+                                                                {formatNumber(item.change, localeCode)} ({item.changePercent !== null && (item.changePercent || 0) >= 0 ? "+" : ""}
+                                                                {formatNumber(item.changePercent, localeCode)}%)
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <select
+                                                            value={mostActiveActions[item.yahooSymbol] || "add"}
+                                                            onChange={(event) => {
+                                                                const next = event.target.value as "add" | "chart" | "ask" | "news";
+                                                                setMostActiveActions((prev) => ({ ...prev, [item.yahooSymbol]: next }));
+                                                            }}
+                                                            className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs"
+                                                        >
+                                                            <option value="add">{isEnglish ? "Add Watchlist" : "加入自選股"}</option>
+                                                            <option value="chart">{isEnglish ? "View K-line" : "看 K 線"}</option>
+                                                            <option value="ask">{isEnglish ? "Ask Golem (Single)" : "單一送 Golem 分析"}</option>
+                                                            <option value="news">{isEnglish ? "Load News" : "看新聞"}</option>
+                                                        </select>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-xs"
+                                                            onClick={() => void handleMostActiveAction(item)}
+                                                            disabled={isSending}
+                                                        >
+                                                            {isEnglish ? "Run" : "執行"}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+                                        {isEnglish ? "No leaderboard data yet." : "暫無排行榜資料。"}
+                                    </div>
+                                )}
+                                {!!mostActiveItems.length && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-full text-xs"
+                                        onClick={() => setShowAllMostActive((prev) => !prev)}
+                                    >
+                                        {showAllMostActive
+                                            ? (isEnglish ? "Show Top 20" : "只看前 20")
+                                            : (isEnglish ? "Expand to Top 50" : "展開到 Top 50")}
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
 
@@ -1146,7 +1500,66 @@ export default function StockAnalysisPage() {
                                         ? "Send live quotes, indicators, search context, and watchlist breadth as a structured snapshot."
                                         : "把即時行情、技術指標、搜尋脈絡與自選股廣度整理成快照。"}
                                 </p>
-                                <Button className="w-full" onClick={handleAskGolem} disabled={isSending || !selectedQuote}>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-foreground">
+                                        {isEnglish ? "Analysis Method" : "分析方法"}
+                                    </label>
+                                    <select
+                                        value={analysisMethod}
+                                        onChange={(event) => setAnalysisMethod(event.target.value as StockAnalysisMethodKey)}
+                                        className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                                    >
+                                        {STOCK_ANALYSIS_METHODS.map((method) => (
+                                            <option key={method.key} value={method.key}>
+                                                {isEnglish ? method.labelEn : method.labelZh}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-muted-foreground">
+                                        {isEnglish ? selectedAnalysisMethod.explainEn : selectedAnalysisMethod.explainZh}
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-foreground">
+                                        {isEnglish ? "Analysis Scope" : "分析範圍"}
+                                    </label>
+                                    <select
+                                        value={analysisScope}
+                                        onChange={(event) => setAnalysisScope(event.target.value as AnalysisScope)}
+                                        className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                                    >
+                                        <option value="selected">{isEnglish ? "Selected symbol only" : "僅目前標的"}</option>
+                                        <option value="watchlist">{isEnglish ? "Entire watchlist" : "全部自選"}</option>
+                                    </select>
+                                    <p className="text-xs text-muted-foreground">
+                                        {analysisScope === "selected"
+                                            ? (isEnglish ? "Only the current symbol snapshot will be sent to Golem." : "只會把目前標的快照送給 Golem。")
+                                            : (isEnglish ? "All watchlist symbols will be included in the snapshot." : "會把全部自選標的一起送進快照。")}
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-semibold text-foreground">
+                                            {isEnglish ? "Prompt for Golem" : "給 Golem 的分析 Prompt"}
+                                        </label>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={() => setAnalysisPrompt(buildStockPromptTemplate(analysisMethod, isEnglish))}
+                                        >
+                                            {isEnglish ? "Reset template" : "重設模板"}
+                                        </Button>
+                                    </div>
+                                    <textarea
+                                        value={analysisPrompt}
+                                        onChange={(event) => setAnalysisPrompt(event.target.value)}
+                                        className="min-h-[96px] w-full rounded-md border border-border bg-background px-2 py-2 text-sm leading-5"
+                                        placeholder={isEnglish ? "Write strategy prompt..." : "輸入分析策略提示..."}
+                                    />
+                                </div>
+                                <Button className="w-full" onClick={() => void handleAskGolem()} disabled={isSending || !selectedQuote}>
                                     {sentSnapshot ? <Check className="mr-2 h-4 w-4" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                     {isSending ? (isEnglish ? "Sending..." : "送出中...") : (isEnglish ? "Ask Golem" : "請 Golem 分析")}
                                 </Button>
@@ -1162,20 +1575,33 @@ export default function StockAnalysisPage() {
                                 <CardDescription>{isEnglish ? "Candlestick Trend" : "K 線趨勢"}</CardDescription>
                                 <CardTitle className="mt-1 text-xl">{selectedQuote?.symbol || displaySymbol(selectedSymbol)} · {selectedQuote?.name || "--"}</CardTitle>
                             </div>
-                            <div className="inline-flex rounded-lg border border-border bg-background p-1">
-                                {(Object.keys(RANGE_MAP) as RangeKey[]).map((option) => (
-                                    <button
-                                        key={option}
-                                        type="button"
-                                        onClick={() => setRange(option)}
-                                        className={cn(
-                                            "h-8 min-w-10 rounded-md px-2 text-xs font-semibold transition-colors",
-                                            range === option ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                                        )}
-                                    >
-                                        {option}
-                                    </button>
-                                ))}
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <select
+                                    value={selectedSymbol}
+                                    onChange={(event) => setSelectedSymbol(event.target.value)}
+                                    className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                                >
+                                    {visibleQuotes.map((quote) => (
+                                        <option key={`chart-${quote.yahooSymbol}`} value={quote.yahooSymbol}>
+                                            {quote.symbol} · {quote.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="inline-flex rounded-lg border border-border bg-background p-1">
+                                    {(Object.keys(RANGE_MAP) as RangeKey[]).map((option) => (
+                                        <button
+                                            key={option}
+                                            type="button"
+                                            onClick={() => setRange(option)}
+                                            className={cn(
+                                                "h-8 min-w-10 rounded-md px-2 text-xs font-semibold transition-colors",
+                                                range === option ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                            )}
+                                        >
+                                            {option}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-5">
@@ -1261,7 +1687,7 @@ export default function StockAnalysisPage() {
                                         tone: getQuoteTone(selectedQuote?.change),
                                     },
                                     { label: isEnglish ? "Volume" : "成交量", value: formatCompact(selectedQuote?.volume, localeCode) },
-                                    { label: isEnglish ? "Mkt Cap" : "市值", value: formatCompact(selectedQuote?.marketCap, localeCode) },
+                                    { label: isEnglish ? "Turnover" : "成交值", value: formatCompact(selectedQuote?.turnover, localeCode) },
                                 ].map((item) => (
                                     <div key={item.label} className="rounded-lg border border-border bg-background p-3">
                                         <div className="text-xs text-muted-foreground">{item.label}</div>

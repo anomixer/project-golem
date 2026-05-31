@@ -20,10 +20,15 @@ const {
     consumeAiQuota,
     getAiQuotaStatus,
 } = require('../../src/services/CryptoMembershipService');
+const {
+    buildDecision,
+    simulatePortfolio,
+} = require('../../src/services/MarketDecisionEngine');
 
 const CACHE_TTL_MS = 45 * 1000;
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_SYMBOLS = 20;
+const MOST_ACTIVE_LIMIT_MAX = 50;
 
 const cache = new Map();
 
@@ -746,6 +751,43 @@ async function fetchQuote(symbol) {
     return quote;
 }
 
+async function fetchCryptoMostActive(limit = 50) {
+    const safeLimit = clamp(toNumber(limit, 50), 1, MOST_ACTIVE_LIMIT_MAX);
+    const cacheKey = `most-active:crypto:${safeLimit}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const url = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=${safeLimit}&scrIds=all_cryptocurrencies_us`;
+    const payload = await fetchJson(url);
+    const quotes = asArray(payload?.finance?.result?.[0]?.quotes);
+    const normalized = quotes.map((quote) => {
+        const yahooSymbol = String(quote?.symbol || '').toUpperCase();
+        const safeSymbol = normalizeSymbol(yahooSymbol);
+        const { base, quote: quoteCurrency } = splitPair(safeSymbol);
+        const price = toNullableNumber(quote?.regularMarketPrice);
+        const previousClose = toNullableNumber(quote?.regularMarketPreviousClose);
+        const change = toNullableNumber(quote?.regularMarketChange);
+        const changePercent = toNullableNumber(quote?.regularMarketChangePercent);
+        const volume = toNumber(quote?.regularMarketVolume, 0);
+        return {
+            symbol: base || getDisplaySymbol(safeSymbol),
+            yahooSymbol: safeSymbol,
+            name: String(quote?.shortName || quote?.longName || base || safeSymbol),
+            volume,
+            price,
+            change,
+            changePercent,
+            previousClose,
+            market: 'crypto',
+            currency: String(quoteCurrency || quote?.currency || 'USDT').toUpperCase(),
+            source: 'Yahoo Finance Screener',
+        };
+    }).filter((item) => item.yahooSymbol && item.volume > 0);
+
+    const sorted = normalized.sort((a, b) => b.volume - a.volume).slice(0, safeLimit);
+    return setCached(cacheKey, sorted, CACHE_TTL_MS);
+}
+
 async function searchYahoo(query) {
     const safeQuery = String(query || '').trim();
     if (!safeQuery) return [];
@@ -1133,6 +1175,23 @@ module.exports = function registerCryptoRoutes() {
         }
     });
 
+    router.get('/api/crypto/most-active', attachMembership, async (req, res) => {
+        try {
+            const limit = clamp(toNumber(req.query.limit, 50), 1, MOST_ACTIVE_LIMIT_MAX);
+            const items = await fetchCryptoMostActive(limit);
+            return res.json({
+                success: true,
+                market: 'crypto',
+                items,
+                generatedAt: new Date().toISOString(),
+                membership: req.cryptoMembership,
+            });
+        } catch (error) {
+            console.error('[Crypto] Failed to fetch most active list:', error);
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    });
+
     router.get('/api/crypto/snapshot', attachMembership, (req, res) => {
         try {
             return res.json({
@@ -1202,6 +1261,34 @@ module.exports = function registerCryptoRoutes() {
             nonce: crypto.randomUUID(),
             generatedAt: new Date().toISOString(),
         });
+    });
+
+    router.post('/api/crypto/decision', attachMembership, (req, res) => {
+        try {
+            const snapshot = req.body?.snapshot || readCryptoSnapshot();
+            const decision = buildDecision(snapshot, { mode: 'crypto' });
+            return res.json({
+                success: true,
+                decision,
+                membership: req.cryptoMembership,
+            });
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
+    });
+
+    router.post('/api/crypto/simulate', attachMembership, (req, res) => {
+        try {
+            const snapshot = req.body?.snapshot || readCryptoSnapshot();
+            const simulation = simulatePortfolio(snapshot, req.body || {});
+            return res.json({
+                success: true,
+                simulation,
+                membership: req.cryptoMembership,
+            });
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     });
 
     return router;

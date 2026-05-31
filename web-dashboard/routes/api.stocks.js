@@ -11,10 +11,15 @@ const {
     searchStockSymbols,
     getDirectory,
 } = require('../../src/services/StockSymbolDirectory');
+const {
+    buildDecision,
+    simulatePortfolio,
+} = require('../../src/services/MarketDecisionEngine');
 
 const CACHE_TTL_MS = 45 * 1000;
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_SYMBOLS = 20;
+const MOST_ACTIVE_LIMIT_MAX = 50;
 
 const cache = new Map();
 
@@ -34,6 +39,13 @@ const TW_FALLBACK_NAMES = {
 };
 const TAIWAN_SYMBOL_RE = /^\d{4,6}[A-Z]{0,3}$/;
 const TAIWAN_YAHOO_SYMBOL_RE = /^\d{4,6}[A-Z]{0,3}\.(TW|TWO)$/;
+const SYMBOL_ALIASES = {
+    TPEX: '^TWOII',
+    TPEx: '^TWOII',
+    OTC: '^TWOII',
+    TAIEX: '^TWII',
+    TWSE: '^TWII',
+};
 
 function createHttpError(statusCode, message) {
     const error = new Error(message);
@@ -101,14 +113,39 @@ function toPositiveNullableNumber(value) {
     return numericValue && numericValue > 0 ? numericValue : null;
 }
 
+function readYahooRawValue(value) {
+    if (value && typeof value === 'object' && value.raw !== undefined) {
+        return value.raw;
+    }
+    return value;
+}
+
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+}
+
+function pickFirst(row, keys) {
+    for (const key of keys) {
+        if (row && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+            return row[key];
+        }
+    }
+    return null;
+}
+
+function toLooseNumber(value) {
+    if (value === null || value === undefined) return null;
+    const cleaned = String(value).replace(/,/g, '').trim();
+    if (!cleaned || cleaned === '--' || cleaned === '---') return null;
+    const numeric = Number(cleaned);
+    return Number.isFinite(numeric) ? numeric : null;
 }
 
 function normalizeSymbol(input) {
     const raw = String(input || '').trim().toUpperCase();
     if (!raw) return '';
     const cleaned = raw.replace(/\s+/g, '');
+    if (SYMBOL_ALIASES[cleaned]) return SYMBOL_ALIASES[cleaned];
     if (TAIWAN_SYMBOL_RE.test(cleaned)) return `${cleaned}.TW`;
     if (TAIWAN_YAHOO_SYMBOL_RE.test(cleaned)) return cleaned;
     return cleaned.replace(/[^A-Z0-9.^=-]/g, '').slice(0, 24);
@@ -397,9 +434,126 @@ async function fetchChart(symbol, range = '1d', interval = '5m') {
     }
 }
 
+async function fetchQuoteSummary(symbol) {
+    const safeSymbol = normalizeSymbol(symbol);
+    if (!safeSymbol) return {};
+    const cacheKey = `summary:${safeSymbol}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const modules = [
+        'summaryDetail',
+        'defaultKeyStatistics',
+        'financialData',
+    ].join(',');
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(safeSymbol)}?modules=${encodeURIComponent(modules)}`;
+    try {
+        const payload = await fetchJson(url);
+        const result = payload?.quoteSummary?.result?.[0] || {};
+        const summaryDetail = result.summaryDetail || {};
+        const statistics = result.defaultKeyStatistics || {};
+        const financialData = result.financialData || {};
+
+        const summary = {
+            trailingPE: toPositiveNullableNumber(readYahooRawValue(summaryDetail.trailingPE)),
+            forwardPE: toPositiveNullableNumber(readYahooRawValue(summaryDetail.forwardPE)),
+            priceToBook: toPositiveNullableNumber(readYahooRawValue(summaryDetail.priceToBook)),
+            beta: toNullableNumber(readYahooRawValue(summaryDetail.beta)),
+            dividendYield: toPositiveNullableNumber(readYahooRawValue(summaryDetail.dividendYield)),
+            dividendRate: toPositiveNullableNumber(readYahooRawValue(summaryDetail.dividendRate)),
+            payoutRatio: toPositiveNullableNumber(readYahooRawValue(summaryDetail.payoutRatio)),
+            epsTrailingTwelveMonths: toNullableNumber(readYahooRawValue(financialData.epsTrailingTwelveMonths)),
+            epsForward: toNullableNumber(readYahooRawValue(financialData.epsForward)),
+            recommendationKey: summaryDetail.recommendationKey || financialData.recommendationKey || null,
+            targetMeanPrice: toPositiveNullableNumber(readYahooRawValue(financialData.targetMeanPrice)),
+            numberOfAnalystOpinions: toPositiveNullableNumber(readYahooRawValue(financialData.numberOfAnalystOpinions)),
+            sharesOutstanding: toPositiveNullableNumber(readYahooRawValue(statistics.sharesOutstanding)),
+        };
+        return setCached(cacheKey, summary, CACHE_TTL_MS);
+    } catch (_error) {
+        return {};
+    }
+}
+
 async function fetchQuote(symbol) {
     const result = await fetchChart(symbol, '1d', '5m');
-    return normalizeQuote(normalizeSymbol(symbol), result);
+    const summary = await fetchQuoteSummary(symbol);
+    return { ...normalizeQuote(normalizeSymbol(symbol), result), ...summary };
+}
+
+async function fetchTwseMostActive(limit = 50) {
+    const safeLimit = clamp(toNumber(limit, 50), 1, MOST_ACTIVE_LIMIT_MAX);
+    const cacheKey = `most-active:tw:${safeLimit}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const payload = await fetchJson('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+    const rows = Array.isArray(payload) ? payload : [];
+    const normalized = rows.map((row) => {
+        const symbol = String(pickFirst(row, ['Code', '證券代號']) || '').trim();
+        const name = String(pickFirst(row, ['Name', '證券名稱']) || symbol).trim();
+        const volume = toLooseNumber(pickFirst(row, ['TradeVolume', '成交股數'])) || 0;
+        const close = toLooseNumber(pickFirst(row, ['ClosingPrice', '收盤價']));
+        const change = toLooseNumber(pickFirst(row, ['Change', '漲跌價差']));
+        const previousClose = close !== null && change !== null ? close - change : null;
+        const changePercent = close !== null && previousClose && previousClose !== 0
+            ? ((close - previousClose) / previousClose) * 100
+            : null;
+        return {
+            symbol,
+            yahooSymbol: symbol ? normalizeSymbol(symbol) : '',
+            name,
+            volume,
+            price: close,
+            change,
+            changePercent,
+            previousClose,
+            market: 'tw',
+            currency: 'TWD',
+            source: 'TWSE OpenAPI + Yahoo symbol normalize',
+        };
+    }).filter((item) => item.symbol && item.volume > 0);
+
+    const top = normalized
+        .sort((a, b) => b.volume - a.volume)
+        .slice(0, safeLimit);
+    return setCached(cacheKey, top, CACHE_TTL_MS);
+}
+
+async function fetchUsMostActive(limit = 50) {
+    const safeLimit = clamp(toNumber(limit, 50), 1, MOST_ACTIVE_LIMIT_MAX);
+    const cacheKey = `most-active:us:${safeLimit}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const url = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=${safeLimit}&scrIds=most_actives`;
+    const payload = await fetchJson(url);
+    const quotes = asArray(payload?.finance?.result?.[0]?.quotes);
+    const normalized = quotes.map((quote) => {
+        const symbolRaw = String(quote?.symbol || '').trim().toUpperCase();
+        const symbol = getDisplaySymbol(symbolRaw);
+        const yahooSymbol = normalizeSymbol(symbolRaw);
+        const price = toNullableNumber(quote?.regularMarketPrice);
+        const previousClose = toNullableNumber(quote?.regularMarketPreviousClose);
+        const change = toNullableNumber(quote?.regularMarketChange);
+        const changePercent = toNullableNumber(quote?.regularMarketChangePercent);
+        const volume = toNumber(quote?.regularMarketVolume, 0);
+        return {
+            symbol,
+            yahooSymbol,
+            name: String(quote?.longName || quote?.shortName || symbol || yahooSymbol),
+            volume,
+            price,
+            change,
+            changePercent,
+            previousClose,
+            market: 'us',
+            currency: String(quote?.currency || 'USD'),
+            source: 'Yahoo Finance Screener',
+        };
+    }).filter((item) => item.yahooSymbol && item.volume > 0);
+
+    return setCached(cacheKey, normalized.slice(0, safeLimit), CACHE_TTL_MS);
 }
 
 async function searchYahoo(query) {
@@ -489,10 +643,13 @@ module.exports = function registerStockRoutes() {
     });
 
     router.get('/api/stocks/history', async (req, res) => {
+        let symbol = '';
+        let range = '3mo';
+        let interval = '1d';
         try {
-            const symbol = normalizeSymbol(req.query.symbol);
-            const range = String(req.query.range || '3mo');
-            const interval = String(req.query.interval || (range === '1d' ? '5m' : '1d'));
+            symbol = normalizeSymbol(req.query.symbol);
+            range = String(req.query.range || '3mo');
+            interval = String(req.query.interval || (range === '1d' ? '5m' : '1d'));
             const allowedRanges = new Set(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y']);
             const allowedIntervals = new Set(['1m', '5m', '15m', '30m', '60m', '1d', '1wk']);
             if (!symbol) return res.status(400).json({ error: 'Missing symbol' });
@@ -508,7 +665,7 @@ module.exports = function registerStockRoutes() {
                 generatedAt: new Date().toISOString(),
             });
         } catch (error) {
-            console.error('[Stocks] Failed to fetch history:', error);
+            console.error(`[Stocks] Failed to fetch history (symbol=${symbol || 'N/A'}, range=${range}, interval=${interval}):`, error);
             return res.status(error.statusCode || 500).json({ error: error.message });
         }
     });
@@ -637,6 +794,51 @@ module.exports = function registerStockRoutes() {
         } catch (error) {
             console.error('[Stocks] Failed to refresh snapshot:', error);
             return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    });
+
+    router.get('/api/stocks/most-active', async (req, res) => {
+        try {
+            const market = String(req.query.market || 'tw').toLowerCase();
+            const limit = clamp(toNumber(req.query.limit, 50), 1, MOST_ACTIVE_LIMIT_MAX);
+            const items = market === 'us'
+                ? await fetchUsMostActive(limit)
+                : await fetchTwseMostActive(limit);
+            return res.json({
+                success: true,
+                market: market === 'us' ? 'us' : 'tw',
+                items,
+                generatedAt: new Date().toISOString(),
+            });
+        } catch (error) {
+            console.error('[Stocks] Failed to fetch most active list:', error);
+            return res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    });
+
+    router.post('/api/stocks/decision', (req, res) => {
+        try {
+            const snapshot = req.body?.snapshot || readStockSnapshot();
+            const decision = buildDecision(snapshot, { mode: 'stock' });
+            return res.json({
+                success: true,
+                decision,
+            });
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
+    });
+
+    router.post('/api/stocks/simulate', (req, res) => {
+        try {
+            const snapshot = req.body?.snapshot || readStockSnapshot();
+            const simulation = simulatePortfolio(snapshot, req.body || {});
+            return res.json({
+                success: true,
+                simulation,
+            });
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
         }
     });
 
