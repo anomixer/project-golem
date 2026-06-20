@@ -22,7 +22,7 @@ class EnvManager {
         const content = fs.readFileSync(this.envPath, 'utf8');
         const envObj = {};
 
-        content.split('\n').forEach(line => {
+        content.split(/\r\n|\n|\r/).forEach(line => {
             // 略過純註解或空行
             if (!line || line.trim().startsWith('#')) return;
 
